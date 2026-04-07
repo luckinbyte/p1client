@@ -11,6 +11,12 @@
   gap: 12px;
 }
 
+.city-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .city-dialog-summary h3 {
   margin: 0;
   font-size: 18px;
@@ -49,6 +55,55 @@
   gap: 8px;
 }
 
+.city-dialog-production-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.city-dialog-building-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.city-dialog-row-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #0f172a;
+}
+
+.city-dialog-row-card-static {
+  justify-content: flex-start;
+}
+
+.city-dialog-row-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.city-dialog-row-meta {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #94a3b8;
+}
+
+.city-dialog-status {
+  font-size: 13px;
+  color: #93c5fd;
+}
+
+.city-dialog-note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #fbbf24;
+}
+
 .city-dialog-section-title {
   font-size: 13px;
   font-weight: 600;
@@ -63,18 +118,16 @@
   color: #cbd5e1;
 }
 
-.city-dialog-note {
-  font-size: 13px;
-  line-height: 1.6;
-  color: #fbbf24;
-}
-
 @media (max-width: 640px) {
-  .city-dialog-summary {
+  .city-dialog-summary,
+  .city-dialog-actions,
+  .city-dialog-row-card {
     flex-direction: column;
+    align-items: stretch;
   }
 
-  .city-dialog-card-grid {
+  .city-dialog-card-grid,
+  .city-dialog-production-grid {
     grid-template-columns: 1fr;
   }
 }

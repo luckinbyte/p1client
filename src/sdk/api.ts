@@ -4,7 +4,14 @@
  */
 
 import { MsgID } from './protocol';
-import type { ApiResponse } from './types';
+import type {
+  ApiResponse,
+  BuildQueueResponse,
+  CancelBuildResponse,
+  CityInfoResponse,
+  CityProductionResponse,
+  UpgradeBuildingResponse,
+} from './types';
 
 /** 请求参数类型 */
 type RequestParams = Record<string, unknown>;
@@ -382,5 +389,36 @@ export class GameAPI {
   /** 获取士兵统计 */
   getSoldierStats() {
     return this.client.request(MsgID.Soldier.Stats);
+  }
+
+  // ============ 城池 ============
+
+  /** 获取城池信息 */
+  getCityInfo() {
+    return this.client.request<CityInfoResponse>(MsgID.City.GetInfo);
+  }
+
+  /** 升级建筑 */
+  upgradeBuilding(buildingType: number) {
+    return this.client.request<UpgradeBuildingResponse>(MsgID.City.Upgrade, {
+      building_type: buildingType,
+    });
+  }
+
+  /** 取消建造 */
+  cancelBuild(queueId: number) {
+    return this.client.request<CancelBuildResponse>(MsgID.City.CancelBuild, {
+      queue_id: queueId,
+    });
+  }
+
+  /** 获取建造队列 */
+  getBuildQueue() {
+    return this.client.request<BuildQueueResponse>(MsgID.City.BuildQueue);
+  }
+
+  /** 获取资源产出 */
+  getCityProduction() {
+    return this.client.request<CityProductionResponse>(MsgID.City.Production);
   }
 }
