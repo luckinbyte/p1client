@@ -1,0 +1,75 @@
+.mobile-map-overlay {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 72px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(74, 74, 106, 0.9);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+.mobile-map-overlay-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-map-overlay-label {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.mobile-map-overlay-title {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.mobile-map-overlay-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.mobile-map-overlay-button {
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.9);
+  color: #bfdbfe;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.mobile-map-overlay-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(71, 85, 105, 0.6);
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.mobile-army-status {
+  color: #fbbf24;
+}
+
+.mobile-army-status.idle {
+  color: #86efac;
+}
+
+@media (min-width: 769px) {
+  .mobile-map-overlay {
+    display: none;
+  }
+}

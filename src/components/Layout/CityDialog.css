@@ -1,0 +1,80 @@
+.city-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.city-dialog-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.city-dialog-summary h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #f8fafc;
+}
+
+.city-dialog-detail {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.city-dialog-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.city-dialog-card {
+  padding: 14px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.city-dialog-card-label {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.city-dialog-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.city-dialog-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.city-dialog-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
+.city-dialog-note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #fbbf24;
+}
+
+@media (max-width: 640px) {
+  .city-dialog-summary {
+    flex-direction: column;
+  }
+
+  .city-dialog-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
