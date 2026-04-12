@@ -43,7 +43,9 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      await login(username.trim())
+      // 先登录
+      await login()
+      // 登录成功后再加载初始数据
       await loadInitialData()
     } catch (err) {
       const message = err instanceof Error ? err.message : '登录失败'

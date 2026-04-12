@@ -103,20 +103,24 @@ export const useGameStore = create<GameState>((set) => ({
       ),
     })),
   setArmies: (armies) =>
-    set((state) => ({
-      armies,
-      selectedArmyId:
-        armies.length === 0
-          ? null
-          : armies.some((army) => army.id === state.selectedArmyId)
-            ? state.selectedArmyId
-            : armies[0].id,
-    })),
+    set((state) => {
+      // 确保 armies 是一个数组
+      const validArmies = Array.isArray(armies) ? armies : [];
+      return {
+        armies: validArmies,
+        selectedArmyId:
+          validArmies.length === 0
+            ? null
+            : validArmies.some((army) => army.id === state.selectedArmyId)
+              ? state.selectedArmyId
+              : validArmies[0].id,
+      };
+    }),
   setSelectedArmyId: (selectedArmyId) => set({ selectedArmyId }),
-  setSoldiers: (soldiers) => set({ soldiers }),
-  setTrainQueue: (trainQueue) => set({ trainQueue }),
-  setHealQueue: (healQueue) => set({ healQueue }),
-  setItems: (items) => set({ items }),
+  setSoldiers: (soldiers) => set({ soldiers: Array.isArray(soldiers) ? soldiers : [] }),
+  setTrainQueue: (trainQueue) => set({ trainQueue: Array.isArray(trainQueue) ? trainQueue : [] }),
+  setHealQueue: (healQueue) => set({ healQueue: Array.isArray(healQueue) ? healQueue : [] }),
+  setItems: (items) => set({ items: Array.isArray(items) ? items : [] }),
   setSelectedEntity: (selectedEntity) => set({ selectedEntity }),
   setSelectedPosition: (selectedPosition) => set({ selectedPosition }),
   setActiveDialog: (activeDialog) => set({ activeDialog }),

@@ -18,10 +18,10 @@ export default function GameLayout() {
 
   const resources = useMemo(
     () => ({
-      food: roleInfo?.resources.food ?? 0,
-      wood: roleInfo?.resources.wood ?? 0,
-      stone: roleInfo?.resources.stone ?? 0,
-      gold: roleInfo?.resources.gold ?? 0,
+      food: roleInfo?.resources?.food ?? 0,
+      wood: roleInfo?.resources?.wood ?? 0,
+      stone: roleInfo?.resources?.stone ?? 0,
+      gold: roleInfo?.resources?.gold ?? 0,
     }),
     [roleInfo],
   )

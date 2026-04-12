@@ -150,37 +150,37 @@ export function useGameApi() {
 
   const connect = useCallback(async () => {
     await gameClient.connect()
-    store.setConnected(true)
-  }, [store])
+  }, [])
 
   const disconnect = useCallback(() => {
     gameClient.disconnect()
     store.setConnected(false)
   }, [store])
 
-  const login = useCallback(
-    async (token: string) => {
-      const response = await gameClient.api.login(token)
+  const login = useCallback(async () => {
+    console.log('[API] starting login...');
+    const response = await gameClient.api.login()
+    console.log('[API] login response:', response);
 
-      if (response.code !== 0) {
-        throw new Error(response.message || 'Login failed')
-      }
+    if (response.code !== 0) {
+      console.error('[API] login failed:', response.message);
+      throw new Error(response.message || 'Login failed')
+    }
 
-      store.setLoggedIn(true)
-      return response
-    },
-    [store],
-  )
+    console.log('[API] login successful');
+    // 暂时不设置 isLoggedIn，等到 loadInitialData 完成后再设置
+    // store.setLoggedIn(true)
+    return response
+  }, [])
 
   const loadInitialData = useCallback(async () => {
-    const [roleInfo, armies, soldiers, trainQueue, healQueue, items] = await Promise.all([
-      gameClient.api.getRoleInfo(),
-      gameClient.api.getArmies(),
-      gameClient.api.getSoldiers(),
-      gameClient.api.getTrainQueue(),
-      gameClient.api.getHealQueue(),
-      gameClient.api.getItems(),
-    ])
+    // 串行加载数据，避免后端处理过多并行请求
+    const roleInfo = await gameClient.api.getRoleInfo();
+    const armies = await gameClient.api.getArmies();
+    const soldiers = await gameClient.api.getSoldiers();
+    const trainQueue = await gameClient.api.getTrainQueue();
+    const healQueue = await gameClient.api.getHealQueue();
+    const items = await gameClient.api.getItems();
 
     if (roleInfo.data) {
       store.setRoleInfo(roleInfo.data as never)
@@ -234,6 +234,9 @@ export function useGameApi() {
 
       store.setSceneObjects(Array.from(sceneObjects.values()) as never)
     }
+
+    // 所有数据加载完成后，设置 isLoggedIn 为 true，触发页面切换
+    store.setLoggedIn(true)
 
     return { roleInfo, armies, soldiers, trainQueue, healQueue, items, sceneEnter, sceneInfo, nearby }
   }, [store])
