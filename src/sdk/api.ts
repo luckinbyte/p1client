@@ -259,10 +259,8 @@ export class WSClient {
       console.log('[WS] received binary message, type=', msgType, 'length=', view.length, 'offset=', offset, 'hex=', Array.from(view.slice(offset, offset + 10)).map(b => b.toString(16).padStart(2, '0')).join(' '));
 
       if (msgType === MsgType.Response) {
-        if (view.length < offset + 3) return;
-
-        const respMsgId = (view[offset + 1] << 8) | view[offset + 2];
-        console.log('[WS] response: msgId=', respMsgId);
+        // 服务端响应格式: [Length(4B)][MsgType(0x02)][JSON payload]
+        // 注意：服务端响应不包含 MsgID 字段
 
         if (!this.isConnected) {
           console.log('[WS] handshake response received, connection established');
@@ -282,23 +280,21 @@ export class WSClient {
           return;
         }
 
-        // 由于后端响应没有 RID 字段，我们使用 msgId 来匹配请求
-        // 这意味着同一时间只能有一个相同 msgId 的请求
+        // 使用 FIFO 匹配请求（因为服务端响应没有 MsgID/RID 字段）
         let matchedCallback: RequestCallback | undefined;
-        for (const [rid, callback] of this.pendingRequests.entries()) {
-          // 假设最新的请求就是我们要匹配的
+        for (const [, callback] of this.pendingRequests.entries()) {
           matchedCallback = callback;
           break;
         }
 
         if (matchedCallback) {
           clearTimeout(matchedCallback.timeout);
-          // 只清除当前处理的请求，而不是所有请求
           this.pendingRequests.delete(Array.from(this.pendingRequests.keys())[0]);
 
           let response: ApiResponse;
-          if (view.length > offset + 3) {
-            const payloadStr = decodeUtf8(view.slice(offset + 3));
+          // payload 紧跟 MsgType 之后，即 view.slice(offset + 1)
+          if (view.length > offset + 1) {
+            const payloadStr = decodeUtf8(view.slice(offset + 1));
             console.log('[WS] response payload:', payloadStr);
             try {
               response = JSON.parse(payloadStr) as ApiResponse;
@@ -313,7 +309,7 @@ export class WSClient {
           return;
         }
 
-        console.warn('Received response for unknown request, msgId:', respMsgId);
+        console.warn('Received response for unknown request');
       }
 
       if (msgType === MsgType.Push) {
@@ -403,8 +399,13 @@ export class GameAPI {
     return this.client.request(MsgID.Item.Use, { item_id: itemId, count });
   }
 
-  enterScene(sceneId: number) {
-    return this.client.request(MsgID.Scene.Enter, { scene_id: sceneId });
+  enterScene(sceneId: number, x?: number, y?: number) {
+    const params: Record<string, unknown> = { scene_id: sceneId };
+    if (x !== undefined && y !== undefined) {
+      params.x = x;
+      params.y = y;
+    }
+    return this.client.request(MsgID.Scene.Enter, params);
   }
 
   move(x: number, y: number) {
@@ -415,8 +416,12 @@ export class GameAPI {
     return this.client.request(MsgID.Scene.Leave);
   }
 
-  getNearby() {
-    return this.client.request(MsgID.Scene.GetNearby);
+  getNearby(sceneId?: number) {
+    const params: Record<string, unknown> = {};
+    if (sceneId !== undefined) {
+      params.scene_id = sceneId;
+    }
+    return this.client.request(MsgID.Scene.GetNearby, params);
   }
 
   getSceneInfo(sceneId: number) {

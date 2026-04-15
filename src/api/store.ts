@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type {
   ArmyData,
+  CityData,
   HealQueueItem,
   ItemData,
   Position,
@@ -30,6 +31,7 @@ interface GameState {
   trainQueue: TrainQueueItem[]
   healQueue: HealQueueItem[]
   items: ItemData[]
+  cityInfo: CityData | null
   selectedEntity: SceneObject | null
   selectedPosition: Position | null
   activeDialog: string | null
@@ -50,6 +52,7 @@ interface GameState {
   setTrainQueue: (queue: TrainQueueItem[]) => void
   setHealQueue: (queue: HealQueueItem[]) => void
   setItems: (items: ItemData[]) => void
+  setCityInfo: (city: CityData | null) => void
   setSelectedEntity: (entity: SceneObject | null) => void
   setSelectedPosition: (position: Position | null) => void
   setActiveDialog: (dialog: string | null) => void
@@ -73,6 +76,7 @@ const initialState = {
   trainQueue: [] as TrainQueueItem[],
   healQueue: [] as HealQueueItem[],
   items: [] as ItemData[],
+  cityInfo: null as CityData | null,
   selectedEntity: null,
   selectedPosition: null,
   activeDialog: null,
@@ -121,6 +125,7 @@ export const useGameStore = create<GameState>((set) => ({
   setTrainQueue: (trainQueue) => set({ trainQueue: Array.isArray(trainQueue) ? trainQueue : [] }),
   setHealQueue: (healQueue) => set({ healQueue: Array.isArray(healQueue) ? healQueue : [] }),
   setItems: (items) => set({ items: Array.isArray(items) ? items : [] }),
+  setCityInfo: (cityInfo) => set({ cityInfo }),
   setSelectedEntity: (selectedEntity) => set({ selectedEntity }),
   setSelectedPosition: (selectedPosition) => set({ selectedPosition }),
   setActiveDialog: (activeDialog) => set({ activeDialog }),

@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { gameClient } from '@/api/client'
 import { useGameStore } from '@/api/store'
-import { PushMsgID, type ArmyData, type SceneInfo, type SceneObject } from '@/sdk'
+import { PushMsgID, type ArmyData, type CityData, type SceneObject } from '@/sdk'
 
 export function usePushHandlers() {
   const addSceneObject = useGameStore((state) => state.addSceneObject)
@@ -201,6 +201,15 @@ export function useGameApi() {
       store.setItems(items.data as never)
     }
 
+    // 获取城池数据
+    const cityResult = await gameClient.api.getCityInfo()
+    if (cityResult.data) {
+      const cityData = (cityResult.data as { city?: CityData }).city
+      if (cityData) {
+        store.setCityInfo(cityData)
+      }
+    }
+
     let sceneEnter = null
     let sceneInfo = null
     let nearby = null
@@ -208,27 +217,33 @@ export function useGameApi() {
     const initialSceneId = ((armies.data as ArmyData[] | undefined)?.[0]?.sceneId ?? 1)
     store.setSceneId(initialSceneId)
 
-    sceneEnter = await gameClient.api.enterScene(initialSceneId)
+    // 使用城池坐标进入场景，没有城池则不传坐标
+    const cityPosition = store.cityInfo?.position
+    sceneEnter = await gameClient.api.enterScene(initialSceneId, cityPosition?.x, cityPosition?.y)
 
     if (sceneEnter.code === 0) {
       sceneInfo = await gameClient.api.getSceneInfo(initialSceneId)
-      nearby = await gameClient.api.getNearby()
+      nearby = await gameClient.api.getNearby(initialSceneId)
 
       const sceneObjects = new Map<number, SceneObject>()
 
-      const sceneInfoData = sceneInfo.data as SceneInfo | undefined
-      const nearbyData = nearby.data as SceneObject[] | undefined
+      // 服务端 get_nearby 返回 { nearby: [...], count: N }
+      // 实体格式为 { id, type, x, y, scene_id, ... } 扁平结构
+      const nearbyResult = nearby.data as { nearby?: Record<string, unknown>[] } | undefined
+      const nearbyList = nearbyResult?.nearby
 
-      if (Array.isArray(sceneInfoData?.objects)) {
-        store.setSceneId(sceneInfoData.id)
-        sceneInfoData.objects.forEach((object) => {
-          sceneObjects.set(object.id, object)
-        })
-      }
-
-      if (Array.isArray(nearbyData)) {
-        nearbyData.forEach((object) => {
-          sceneObjects.set(object.id, object)
+      if (Array.isArray(nearbyList)) {
+        nearbyList.forEach((raw) => {
+          const obj: SceneObject = {
+            id: raw.id as number,
+            type: raw.type as SceneObject['type'],
+            position: { x: (raw.x as number) || 0, y: (raw.y as number) || 0 },
+            ownerId: raw.owner_id as bigint | undefined,
+            level: raw.level as number | undefined,
+            resourceType: raw.resource_type as SceneObject['resourceType'],
+            resourceAmount: raw.resource_amount as number | undefined,
+          }
+          sceneObjects.set(obj.id, obj)
         })
       }
 
