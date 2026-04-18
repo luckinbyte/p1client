@@ -182,23 +182,29 @@ export function useGameApi() {
     const healQueue = await gameClient.api.getHealQueue();
     const items = await gameClient.api.getItems();
 
+    // 服务端响应格式: { code, data: { key: [...] } }，需要从 data 中提取具体字段
     if (roleInfo.data) {
       store.setRoleInfo(roleInfo.data as never)
     }
     if (armies.data) {
-      store.setArmies(armies.data as never)
+      const d = armies.data as { armies?: unknown[] }
+      store.setArmies((d.armies ?? []) as never)
     }
     if (soldiers.data) {
-      store.setSoldiers(soldiers.data as never)
+      const d = soldiers.data as { soldiers?: unknown[] }
+      store.setSoldiers((d.soldiers ?? []) as never)
     }
     if (trainQueue.data) {
-      store.setTrainQueue(trainQueue.data as never)
+      const d = trainQueue.data as { queue?: unknown[] }
+      store.setTrainQueue((d.queue ?? []) as never)
     }
     if (healQueue.data) {
-      store.setHealQueue(healQueue.data as never)
+      const d = healQueue.data as { queue?: unknown }
+      store.setHealQueue(Array.isArray(d.queue) ? d.queue as never : d.queue ? [d.queue] as never : [] as never)
     }
     if (items.data) {
-      store.setItems(items.data as never)
+      const d = items.data as { items?: unknown[] }
+      store.setItems((d.items ?? []) as never)
     }
 
     // 获取城池数据
