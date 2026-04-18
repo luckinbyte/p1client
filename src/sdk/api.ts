@@ -59,6 +59,7 @@ export class WSClient {
   public onConnected?: () => void;
   public onDisconnected?: () => void;
   public onError?: (error: Event) => void;
+  public onPush?: (data: unknown) => void;
 
   constructor(config: WSConfig) {
     this.config = {
@@ -313,25 +314,24 @@ export class WSClient {
       }
 
       if (msgType === MsgType.Push) {
-        if (view.length < offset + 3) return;
-
-        const msgId = (view[offset + 1] << 8) | (view[offset + 2]);
-
-        const handlers = this.eventHandlers.get(msgId);
-        if (handlers) {
-          let pushData: unknown;
-          if (view.length > offset + 3) {
-            const payloadStr = decodeUtf8(view.slice(offset + 3));
-            try {
-              pushData = JSON.parse(payloadStr);
-            } catch {
-              pushData = payloadStr;
-            }
-          } else {
-            pushData = {};
+        // 服务端推送格式: [Length(4B)][MsgType(0x03)][JSON payload]
+        // 推送不包含 MsgID，与响应格式一致
+        let pushData: unknown = {};
+        if (view.length > offset + 1) {
+          const payloadStr = decodeUtf8(view.slice(offset + 1));
+          console.log('[WS] push payload:', payloadStr);
+          try {
+            pushData = JSON.parse(payloadStr);
+          } catch {
+            pushData = payloadStr;
           }
-          handlers.forEach((handler) => handler(pushData));
         }
+
+        // 调用全局推送回调
+        this.onPush?.(pushData);
+
+        // 兼容旧的 msgId 匹配逻辑（已失效，保留不删）
+        // 由于推送无 MsgID，下方逻辑不会匹配到任何 handler
       }
     } catch (error) {
       console.error('Failed to parse message:', error);

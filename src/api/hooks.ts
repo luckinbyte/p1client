@@ -14,6 +14,7 @@ export function usePushHandlers() {
   const setBattleStatus = useGameStore((state) => state.setBattleStatus)
   const setRoleInfo = useGameStore((state) => state.setRoleInfo)
   const addEventLog = useGameStore((state) => state.addEventLog)
+  const updateResources = useGameStore((state) => state.updateResources)
 
   const refreshSoldierState = async () => {
     const [soldiersResponse, trainQueueResponse, healQueueResponse] = await Promise.all([
@@ -120,7 +121,25 @@ export function usePushHandlers() {
       void refreshSoldierState()
     })
 
+    // 全局推送监听：服务端推送无 MsgID，通过 onPush 回调统一接收
+    gameClient.ws.onPush = (raw) => {
+      const payload = raw as { code?: number; data?: Record<string, unknown> }
+      const data = payload?.data
+      if (!data) return
+
+      // 资源推送: { code, data: { rid, food, wood, stone, gold } }
+      if (typeof data.food === 'number' || typeof data.gold === 'number') {
+        updateResources({
+          food: data.food as number,
+          wood: data.wood as number,
+          stone: data.stone as number,
+          gold: data.gold as number,
+        })
+      }
+    }
+
     return () => {
+      gameClient.ws.onPush = undefined
       unsubscribeSceneEnter()
       unsubscribeSceneLeave()
       unsubscribeSceneUpdate()
@@ -141,6 +160,7 @@ export function usePushHandlers() {
     setRoleInfo,
     setSoldiers,
     setTrainQueue,
+    updateResources,
     updateSceneObjectPosition,
   ])
 }
@@ -182,9 +202,24 @@ export function useGameApi() {
     const healQueue = await gameClient.api.getHealQueue();
     const items = await gameClient.api.getItems();
 
-    // 服务端响应格式: { code, data: { key: [...] } }，需要从 data 中提取具体字段
+    // 服务端 get_info 返回扁平字段 { rid, name, level, exp, gold, vip, food, wood, stone }
+    // 前端 RoleInfo 期望嵌套 resources: { food, wood, stone, gold }
     if (roleInfo.data) {
-      store.setRoleInfo(roleInfo.data as never)
+      const d = roleInfo.data as Record<string, unknown>
+      store.setRoleInfo({
+        rid: d.rid as bigint,
+        name: (d.name as string) ?? '',
+        level: (d.level as number) ?? 1,
+        exp: (d.exp as number) ?? 0,
+        vip: (d.vip as number) ?? 0,
+        resources: {
+          food: (d.food as number) ?? 0,
+          wood: (d.wood as number) ?? 0,
+          stone: (d.stone as number) ?? 0,
+          gold: (d.gold as number) ?? 0,
+        },
+        position: { x: 0, y: 0 },
+      })
     }
     if (armies.data) {
       const d = armies.data as { armies?: unknown[] }
