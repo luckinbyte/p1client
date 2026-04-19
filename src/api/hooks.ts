@@ -25,13 +25,19 @@ export function usePushHandlers() {
     ])
 
     if (soldiersResponse.data) {
-      setSoldiers(soldiersResponse.data as never)
+      const data = soldiersResponse.data as { soldiers?: unknown[] } | unknown[]
+      const soldiers = Array.isArray(data) ? data : (data.soldiers ?? [])
+      setSoldiers(soldiers as never)
     }
     if (trainQueueResponse.data) {
-      setTrainQueue(trainQueueResponse.data as never)
+      const data = trainQueueResponse.data as { queue?: unknown[] } | unknown[]
+      const queue = Array.isArray(data) ? data : (data.queue ?? [])
+      setTrainQueue(queue as never)
     }
     if (healQueueResponse.data) {
-      setHealQueue(healQueueResponse.data as never)
+      const data = healQueueResponse.data as { queue?: unknown } | unknown[]
+      const queue = Array.isArray(data) ? data : data.queue
+      setHealQueue((Array.isArray(queue) ? queue : queue ? [queue] : []) as never)
     }
   }
 
@@ -112,8 +118,12 @@ export function usePushHandlers() {
       void refreshBattleState()
     })
 
-    const unsubscribeTrainComplete = gameClient.ws.on(PushMsgID.TrainComplete, () => {
-      addEventLog('训练完成，可领取训练结果')
+    const unsubscribeTrainComplete = gameClient.ws.on(PushMsgID.TrainComplete, (data) => {
+      const payload = data as { soldier_type?: number; level?: number; count?: number; queue_id?: number }
+      const soldierType = payload.soldier_type ?? 0
+      const level = payload.level ?? 0
+      const count = payload.count ?? 0
+      addEventLog(`训练完成：兵种 ${soldierType} 等级 ${level} x${count}`)
       void refreshSoldierState()
     })
 
