@@ -121,7 +121,8 @@ export function usePushHandlers() {
       void refreshSoldierState()
     })
 
-    // 全局推送监听：服务端推送无 MsgID，通过 onPush 回调统一接收
+    // 资源推送监听：服务端资源更新 push (msgId=1003) 无专用 handler，
+    // 通过 onPush 全局回调接收并更新 resources store
     gameClient.ws.onPush = (raw) => {
       const payload = raw as { code?: number; data?: Record<string, unknown> }
       const data = payload?.data

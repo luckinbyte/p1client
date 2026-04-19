@@ -29,7 +29,10 @@ export default function GameLayout() {
   return (
     <div className="game-layout">
       <header className="game-header">
-        <div className="header-player">{roleInfo?.name ?? '未登录玩家'}</div>
+        <div className="header-player">
+          {roleInfo?.name ?? '未登录玩家'}
+          {roleInfo?.level != null && <span className="header-level">Lv.{roleInfo.level}</span>}
+        </div>
         <div className="header-resources">
           <span>🌾 {resources.food}</span>
           <span>🪵 {resources.wood}</span>
