@@ -78,19 +78,71 @@ function normalizeSoldiers(data: unknown): SoldierData[] {
   return []
 }
 
+type RawTrainQueueItem = {
+  id?: number
+  soldierId?: number
+  soldier_id?: number
+  soldierType?: number
+  soldier_type?: number
+  level?: number
+  count?: number
+  startTime?: number
+  start_time?: number
+  finishTime?: number
+  finish_time?: number
+  isUpgrade?: boolean
+  is_upgrade?: boolean
+}
+
+function normalizeTrainQueueItem(item: unknown): TrainQueueItem | null {
+  if (!item || typeof item !== 'object') {
+    return null
+  }
+
+  const raw = item as RawTrainQueueItem
+  const id = raw.id
+  const soldierId = raw.soldierId ?? raw.soldier_id
+  const soldierType = raw.soldierType ?? raw.soldier_type
+  const level = raw.level
+  const count = raw.count
+  const startTime = raw.startTime ?? raw.start_time
+  const finishTime = raw.finishTime ?? raw.finish_time
+  const isUpgrade = raw.isUpgrade ?? raw.is_upgrade ?? false
+
+  if (
+    typeof id !== 'number' ||
+    typeof soldierId !== 'number' ||
+    typeof soldierType !== 'number' ||
+    typeof level !== 'number' ||
+    typeof count !== 'number' ||
+    typeof startTime !== 'number' ||
+    typeof finishTime !== 'number'
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    soldierId,
+    soldierType,
+    level,
+    count,
+    startTime,
+    finishTime,
+    isUpgrade,
+  }
+}
+
 function normalizeTrainQueue(data: unknown): TrainQueueItem[] {
-  if (Array.isArray(data)) {
-    return data as TrainQueueItem[]
-  }
+  const queue = Array.isArray(data)
+    ? data
+    : data && typeof data === 'object' && Array.isArray((data as { queue?: unknown }).queue)
+      ? (data as { queue: unknown[] }).queue
+      : []
 
-  if (data && typeof data === 'object') {
-    const queue = (data as { queue?: unknown }).queue
-    if (Array.isArray(queue)) {
-      return queue as TrainQueueItem[]
-    }
-  }
-
-  return []
+  return queue
+    .map((item) => normalizeTrainQueueItem(item))
+    .filter((item): item is TrainQueueItem => item !== null)
 }
 
 function getTotalCosts(config: SoldierConfigItem, count: number): Resources {

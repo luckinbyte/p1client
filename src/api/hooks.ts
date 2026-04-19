@@ -1,7 +1,74 @@
 import { useCallback, useEffect } from 'react'
 import { gameClient } from '@/api/client'
 import { useGameStore } from '@/api/store'
-import { PushMsgID, type ArmyData, type CityData, type SceneObject } from '@/sdk'
+import { PushMsgID, type ArmyData, type CityData, type SceneObject, type TrainQueueItem } from '@/sdk'
+
+type RawTrainQueueItem = {
+  id?: number
+  soldierId?: number
+  soldier_id?: number
+  soldierType?: number
+  soldier_type?: number
+  level?: number
+  count?: number
+  startTime?: number
+  start_time?: number
+  finishTime?: number
+  finish_time?: number
+  isUpgrade?: boolean
+  is_upgrade?: boolean
+}
+
+function normalizeTrainQueueItem(item: unknown): TrainQueueItem | null {
+  if (!item || typeof item !== 'object') {
+    return null
+  }
+
+  const raw = item as RawTrainQueueItem
+  const id = raw.id
+  const soldierId = raw.soldierId ?? raw.soldier_id
+  const soldierType = raw.soldierType ?? raw.soldier_type
+  const level = raw.level
+  const count = raw.count
+  const startTime = raw.startTime ?? raw.start_time
+  const finishTime = raw.finishTime ?? raw.finish_time
+  const isUpgrade = raw.isUpgrade ?? raw.is_upgrade ?? false
+
+  if (
+    typeof id !== 'number' ||
+    typeof soldierId !== 'number' ||
+    typeof soldierType !== 'number' ||
+    typeof level !== 'number' ||
+    typeof count !== 'number' ||
+    typeof startTime !== 'number' ||
+    typeof finishTime !== 'number'
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    soldierId,
+    soldierType,
+    level,
+    count,
+    startTime,
+    finishTime,
+    isUpgrade,
+  }
+}
+
+function normalizeTrainQueue(data: unknown): TrainQueueItem[] {
+  const queue = Array.isArray(data)
+    ? data
+    : data && typeof data === 'object' && Array.isArray((data as { queue?: unknown }).queue)
+      ? (data as { queue: unknown[] }).queue
+      : []
+
+  return queue
+    .map((item) => normalizeTrainQueueItem(item))
+    .filter((item): item is TrainQueueItem => item !== null)
+}
 
 export function usePushHandlers() {
   const addSceneObject = useGameStore((state) => state.addSceneObject)
@@ -30,9 +97,7 @@ export function usePushHandlers() {
       setSoldiers(soldiers as never)
     }
     if (trainQueueResponse.data) {
-      const data = trainQueueResponse.data as { queue?: unknown[] } | unknown[]
-      const queue = Array.isArray(data) ? data : (data.queue ?? [])
-      setTrainQueue(queue as never)
+      setTrainQueue(normalizeTrainQueue(trainQueueResponse.data) as never)
     }
     if (healQueueResponse.data) {
       const data = healQueueResponse.data as { queue?: unknown } | unknown[]
@@ -260,8 +325,7 @@ export function useGameApi() {
       store.setSoldiers((d.soldiers ?? []) as never)
     }
     if (trainQueue.data) {
-      const d = trainQueue.data as { queue?: unknown[] }
-      store.setTrainQueue((d.queue ?? []) as never)
+      store.setTrainQueue(normalizeTrainQueue(trainQueue.data) as never)
     }
     if (healQueue.data) {
       const d = healQueue.data as { queue?: unknown }

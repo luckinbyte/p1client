@@ -136,8 +136,8 @@ export interface TrainQueueItem {
   soldierType: number;  // 兵种类型
   level: number;        // 等级
   count: number;        // 数量
-  startTime: number;    // 开始时间(毫秒)
-  finishTime: number;   // 完成时间(毫秒)
+  startTime: number;    // 开始时间(Unix 秒)
+  finishTime: number;   // 完成时间(Unix 秒)
   isUpgrade: boolean;   // 是否晋升训练
 }
 
@@ -145,8 +145,8 @@ export interface TrainQueueItem {
 export interface HealQueueItem {
   id: number;           // 队列ID
   soldiers: Record<number, number>; // soldierId -> count
-  startTime: number;    // 开始时间(毫秒)
-  finishTime: number;   // 完成时间(毫秒)
+  startTime: number;    // 开始时间(Unix 秒)
+  finishTime: number;   // 完成时间(Unix 秒)
 }
 
 // ============ 军队/行军 ============
