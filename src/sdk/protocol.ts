@@ -84,6 +84,9 @@ export const PushMsgID = {
   // 士兵推送
   TrainComplete: 6301,  // 训练完成
   HealComplete: 6302,   // 治疗完成
+
+  // 建筑推送
+  BuildComplete: 6401,  // 建造完成
 } as const;
 
 /** 模块名称映射 */
