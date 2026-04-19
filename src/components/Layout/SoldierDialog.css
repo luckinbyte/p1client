@@ -34,99 +34,178 @@
   gap: 8px;
 }
 
-.soldier-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.soldier-type-groups,
+.soldier-type-list,
+.soldier-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.soldier-type-group {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
-.soldier-stats-card {
+.soldier-type-group-header {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.82);
-  font-size: 12px;
-  color: #94a3b8;
 }
 
-.soldier-stats-card strong {
-  color: #e2e8f0;
-  font-size: 16px;
-}
-
-.soldier-card-list,
-.queue-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.soldier-card,
-.queue-item {
-  border: 1px solid #334155;
-  border-radius: 10px;
-  background: #0f172a;
-  padding: 14px;
-}
-
-.soldier-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.soldier-card-actions,
-.queue-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.queue-title-row {
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.queue-title-row .queue-title {
-  margin: 0;
-}
-
-.soldier-name,
-.queue-title {
-  font-size: 15px;
+.soldier-type-group-title {
+  font-size: 14px;
   font-weight: 700;
   color: #e2e8f0;
 }
 
-.soldier-meta,
-.queue-meta,
+.soldier-type-group-desc,
 .soldier-empty {
   font-size: 13px;
   color: #94a3b8;
 }
 
-.soldier-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 14px;
+.soldier-dialog-row-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #0f172a;
 }
 
-.soldier-grid div {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
+.soldier-dialog-row-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.soldier-dialog-row-meta {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
   color: #94a3b8;
 }
 
-.soldier-grid strong {
+.soldier-type-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #0f172a;
+}
+
+.soldier-type-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.soldier-type-name {
   font-size: 14px;
+  font-weight: 700;
   color: #e2e8f0;
+}
+
+.soldier-type-meta {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #94a3b8;
+}
+
+.soldier-type-cost {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.soldier-dialog-quantity-input {
+  width: 80px;
+  padding: 6px 10px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.soldier-dialog-quantity-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.soldier-dialog-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 320px;
+}
+
+.soldier-dialog-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  gap: 12px;
+}
+
+.soldier-dialog-confirm-row-input {
+  align-items: center;
+}
+
+.soldier-dialog-confirm-label {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.soldier-dialog-confirm-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.soldier-dialog-confirm-insufficient {
+  color: #fca5a5;
+}
+
+.soldier-dialog-confirm-section {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.soldier-dialog-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.soldier-dialog-progress-bar {
+  margin-top: 6px;
+  height: 4px;
+  background: #1e293b;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.soldier-dialog-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  border-radius: 2px;
+  transition: width 1s linear;
 }
 
 .soldier-status {
@@ -136,16 +215,17 @@
 
 @media (max-width: 768px) {
   .soldier-section-header,
-  .soldier-card-top,
   .soldier-header-actions,
-  .soldier-card-actions,
-  .queue-title-row {
+  .soldier-dialog-row-card,
+  .soldier-type-card,
+  .soldier-type-card-actions,
+  .soldier-dialog-confirm-row,
+  .soldier-dialog-confirm-actions {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .soldier-grid,
-  .soldier-stats-grid {
-    grid-template-columns: 1fr;
+  .soldier-dialog-quantity-input {
+    width: 100%;
   }
 }
