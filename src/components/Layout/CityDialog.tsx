@@ -3,11 +3,47 @@ import { gameClient } from '@/api/client'
 import { useGameStore } from '@/api/store'
 import { Button } from '@/components/common/Button'
 import { Modal } from '@/components/common/Modal'
-import { EntityType, type BuildQueueItem, type BuildingData, type CityData, type Resources, type RoleInfo } from '@/sdk'
+import { EntityType, type BuildQueueItem, type CityData, type Resources, type RoleInfo } from '@/sdk'
 import './CityDialog.css'
+
+/** Building type to Chinese name mapping */
+const BUILDING_NAMES: Record<number, string> = {
+  1: '城堡',
+  2: '兵营',
+  3: '农场',
+  4: '伐木场',
+  5: '采石场',
+  6: '医院',
+  7: '仓库',
+}
+
+/** All 7 building types that should always be displayed */
+const ALL_BUILDING_TYPES = [1, 2, 3, 4, 5, 6, 7]
+
+/** Building costs by type -> level -> cost */
+const BUILDING_COSTS: Record<number, Record<number, { food: number; wood: number; stone: number; gold: number; buildTime: number }>> = {
+  1: { 1: { food: 0, wood: 0, stone: 0, gold: 0, buildTime: 0 }, 2: { food: 500, wood: 1000, stone: 500, gold: 100, buildTime: 3600 }, 3: { food: 1200, wood: 1800, stone: 1000, gold: 250, buildTime: 7200 } },
+  2: { 1: { food: 100, wood: 200, stone: 100, gold: 0, buildTime: 300 }, 2: { food: 300, wood: 400, stone: 250, gold: 50, buildTime: 900 } },
+  3: { 1: { food: 50, wood: 100, stone: 50, gold: 0, buildTime: 180 }, 2: { food: 120, wood: 220, stone: 100, gold: 20, buildTime: 480 } },
+  4: { 1: { food: 50, wood: 80, stone: 50, gold: 0, buildTime: 180 }, 2: { food: 120, wood: 180, stone: 100, gold: 20, buildTime: 480 } },
+  5: { 1: { food: 80, wood: 100, stone: 80, gold: 0, buildTime: 240 }, 2: { food: 180, wood: 220, stone: 180, gold: 30, buildTime: 600 } },
+  6: { 1: { food: 120, wood: 150, stone: 120, gold: 20, buildTime: 360 } },
+  7: { 1: { food: 100, wood: 200, stone: 150, gold: 20, buildTime: 360 } },
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds <= 0) return '已完成'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(h)}:${pad(m)}:${pad(s)}`
+}
 
 export default function CityDialog() {
   const { activeDialog, setActiveDialog, sceneObjects, selectedEntity, addEventLog, updateResources } = useGameStore()
+  const roleInfo = useGameStore((state) => state.roleInfo)
+  const resources = roleInfo?.resources
   const [cityInfo, setCityInfo] = useState<CityData | null>(null)
   const [buildQueue, setBuildQueue] = useState<BuildQueueItem[]>([])
   const [completedQueue, setCompletedQueue] = useState<BuildQueueItem[]>([])
@@ -16,6 +52,9 @@ export default function CityDialog() {
   const [upgradingType, setUpgradingType] = useState<number | null>(null)
   const [cancelingQueueId, setCancelingQueueId] = useState<number | null>(null)
   const [actionStatus, setActionStatus] = useState('')
+  const [confirmModal, setConfirmModal] = useState<{ buildingType: number; targetLevel: number; cost: { food: number; wood: number; stone: number; gold: number; buildTime: number } } | null>(null)
+  const [inlineError, setInlineError] = useState<string | null>(null)
+  const [now, setNow] = useState(Math.floor(Date.now() / 1000))
 
   const cityObjects = useMemo(
     () => sceneObjects.filter((object) => object.type === EntityType.City || object.type === EntityType.Building),
@@ -24,6 +63,8 @@ export default function CityDialog() {
 
   const focusObject =
     selectedEntity?.type === EntityType.City || selectedEntity?.type === EntityType.Building ? selectedEntity : cityObjects[0] ?? null
+
+  const isQueueActive = buildQueue.length > 0
 
   const syncRoleResources = async () => {
     const roleResponse = await gameClient.api.getRoleInfo()
@@ -80,6 +121,13 @@ export default function CityDialog() {
     }
   }, [activeDialog])
 
+  // Countdown timer tick
+  useEffect(() => {
+    if (activeDialog !== 'city') return
+    const timer = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [activeDialog])
+
   const title = cityInfo ? `城池 #${cityInfo.cityId}` : focusObject?.type === EntityType.City ? `城池 #${focusObject.id}` : '城池与建筑'
 
   const detail = useMemo(() => {
@@ -100,29 +148,6 @@ export default function CityDialog() {
 
     return `${positionLabel}${focusObject.ownerId ? ` · 归属 ${String(focusObject.ownerId)}` : ''}`
   }, [cityInfo, focusObject])
-
-  const buildingList = useMemo(() => Object.values(cityInfo?.buildings ?? {}) as BuildingData[], [cityInfo])
-
-  const handleUpgradeBuilding = async (buildingType: number) => {
-    setUpgradingType(buildingType)
-    setActionStatus('')
-
-    try {
-      const response = await gameClient.api.upgradeBuilding(buildingType)
-      if (response.code !== 0) {
-        setActionStatus(response.message || '升级建筑失败')
-        return
-      }
-
-      await Promise.all([loadCityData(), syncRoleResources()])
-      addEventLog(`已发起建筑升级 type=${buildingType}`)
-      setActionStatus(`已加入建筑升级队列 type=${buildingType}`)
-    } catch (error) {
-      setActionStatus(error instanceof Error ? error.message : '升级建筑失败')
-    } finally {
-      setUpgradingType(null)
-    }
-  }
 
   const handleCancelBuild = async (queueId: number) => {
     setCancelingQueueId(queueId)
@@ -165,16 +190,8 @@ export default function CityDialog() {
 
         <div className="city-dialog-card-grid">
           <div className="city-dialog-card">
-            <div className="city-dialog-card-label">当前场景城池</div>
-            <strong>{sceneObjects.filter((object) => object.type === EntityType.City).length}</strong>
-          </div>
-          <div className="city-dialog-card">
-            <div className="city-dialog-card-label">当前场景建筑</div>
-            <strong>{sceneObjects.filter((object) => object.type === EntityType.Building).length}</strong>
-          </div>
-          <div className="city-dialog-card">
             <div className="city-dialog-card-label">城内建筑</div>
-            <strong>{buildingList.length}</strong>
+            <strong>{Object.keys(cityInfo?.buildings ?? {}).length}</strong>
           </div>
           <div className="city-dialog-card">
             <div className="city-dialog-card-label">建造队列</div>
@@ -208,29 +225,123 @@ export default function CityDialog() {
 
         <div className="city-dialog-section">
           <div className="city-dialog-section-title">建筑列表</div>
-          {buildingList.length === 0 ? (
-            <div className="city-dialog-note">当前暂无建筑数据</div>
-          ) : (
-            <div className="city-dialog-building-list">
-              {buildingList.map((building) => (
-                <div key={building.entityId} className="city-dialog-row-card">
+          <div className="city-dialog-building-list">
+            {ALL_BUILDING_TYPES.map((type) => {
+              const building = cityInfo?.buildings[type]
+              const name = BUILDING_NAMES[type] ?? `建筑 ${type}`
+              const isBuilt = building != null
+              const currentLevel = isBuilt ? building.level : 0
+              const targetLevel = currentLevel + 1
+              const cost = BUILDING_COSTS[type]?.[targetLevel]
+              const isSubmitting = upgradingType === type
+
+              const handleUpgradeClick = () => {
+                setInlineError(null)
+                if (!cost) return
+
+                if (resources && (
+                  resources.food < cost.food ||
+                  resources.wood < cost.wood ||
+                  resources.stone < cost.stone ||
+                  resources.gold < cost.gold
+                )) {
+                  setInlineError('资源不足')
+                  return
+                }
+
+                if (isQueueActive) {
+                  setInlineError('建造队列已满')
+                  return
+                }
+
+                setConfirmModal({ buildingType: type, targetLevel, cost })
+              }
+
+              return (
+                <div key={type} className={`city-dialog-row-card${!isBuilt ? ' city-dialog-row-card-unbuilt' : ''}`}>
                   <div>
-                    <div className="city-dialog-row-title">建筑类型 {building.type}</div>
-                    <div className="city-dialog-row-meta">等级 {building.level} · HP {building.hp} · 实体 {building.entityId}</div>
+                    <div className="city-dialog-row-title">
+                      {name}
+                      {!isBuilt && <span className="city-dialog-unbuilt-badge">未建造</span>}
+                    </div>
+                    <div className="city-dialog-row-meta">
+                      {isBuilt
+                        ? `等级 ${currentLevel} · HP ${building.hp}`
+                        : '尚未建造'
+                      }
+                    </div>
                   </div>
                   <Button
-                    disabled={upgradingType === building.type}
-                    onClick={() => void handleUpgradeBuilding(building.type)}
+                    disabled={isSubmitting || isQueueActive}
+                    onClick={handleUpgradeClick}
                     size="small"
-                    variant="secondary"
+                    variant={isBuilt ? 'secondary' : 'primary'}
                   >
-                    {upgradingType === building.type ? '升级中...' : '升级'}
+                    {isSubmitting ? '处理中...' : isBuilt ? '升级' : '建造'}
                   </Button>
                 </div>
-              ))}
-            </div>
-          )}
+              )
+            })}
+          </div>
+          {inlineError && <div className="city-dialog-inline-error">{inlineError}</div>}
         </div>
+
+        {confirmModal && (
+          <Modal isOpen={true} onClose={() => setConfirmModal(null)} title={confirmModal.targetLevel === 1 ? '建造建筑' : '升级建筑'}>
+            <div className="city-dialog-confirm">
+              <div className="city-dialog-confirm-row">
+                <span className="city-dialog-confirm-label">建筑名称</span>
+                <span className="city-dialog-confirm-value">{BUILDING_NAMES[confirmModal.buildingType]}</span>
+              </div>
+              <div className="city-dialog-confirm-row">
+                <span className="city-dialog-confirm-label">等级变化</span>
+                <span className="city-dialog-confirm-value">
+                  {confirmModal.targetLevel === 1 ? '新建造' : `${confirmModal.targetLevel - 1} -> ${confirmModal.targetLevel}`}
+                </span>
+              </div>
+              <div className="city-dialog-confirm-section">资源消耗</div>
+              {(['food', 'wood', 'stone', 'gold'] as const).map((key) => {
+                const labels: Record<string, string> = { food: '粮食', wood: '木材', stone: '石料', gold: '黄金' }
+                const current = resources?.[key] ?? 0
+                const required = confirmModal.cost[key]
+                const sufficient = current >= required
+                return (
+                  <div key={key} className="city-dialog-confirm-row">
+                    <span className="city-dialog-confirm-label">{labels[key]}</span>
+                    <span className={`city-dialog-confirm-value${!sufficient ? ' city-dialog-confirm-insufficient' : ''}`}>
+                      {current} / {required}
+                    </span>
+                  </div>
+                )
+              })}
+              <div className="city-dialog-confirm-row">
+                <span className="city-dialog-confirm-label">建造时间</span>
+                <span className="city-dialog-confirm-value">{formatDuration(confirmModal.cost.buildTime)}</span>
+              </div>
+              <div className="city-dialog-confirm-actions">
+                <Button onClick={() => setConfirmModal(null)} variant="secondary">取消</Button>
+                <Button onClick={async () => {
+                  setUpgradingType(confirmModal.buildingType)
+                  setConfirmModal(null)
+                  setActionStatus('')
+                  try {
+                    const response = await gameClient.api.upgradeBuilding(confirmModal.buildingType)
+                    if (response.code !== 0) {
+                      setActionStatus(response.message || '操作失败')
+                      return
+                    }
+                    await Promise.all([loadCityData(), syncRoleResources()])
+                    addEventLog(`${confirmModal.targetLevel === 1 ? '建造' : '升级'} ${BUILDING_NAMES[confirmModal.buildingType]}`)
+                  } catch (error) {
+                    setActionStatus(error instanceof Error ? error.message : '操作失败')
+                  } finally {
+                    setUpgradingType(null)
+                  }
+                }} variant="primary">确认</Button>
+              </div>
+            </div>
+          </Modal>
+        )}
 
         <div className="city-dialog-section">
           <div className="city-dialog-section-title">建造队列</div>
@@ -238,24 +349,32 @@ export default function CityDialog() {
             <div className="city-dialog-note">当前没有建造队列</div>
           ) : (
             <div className="city-dialog-building-list">
-              {buildQueue.map((item) => (
-                <div key={item.id} className="city-dialog-row-card">
-                  <div>
-                    <div className="city-dialog-row-title">队列 #{item.id}</div>
-                    <div className="city-dialog-row-meta">
-                      建筑类型 {item.buildingType} · 目标等级 {item.targetLevel} · 完成时间 {new Date(item.finishTime).toLocaleString()}
+              {buildQueue.map((item) => {
+                const remaining = item.finishTime - now
+                const totalDuration = item.finishTime - item.startTime
+                const progress = totalDuration > 0 ? Math.max(0, Math.min(100, ((totalDuration - remaining) / totalDuration) * 100)) : 100
+                return (
+                  <div key={item.id} className="city-dialog-row-card">
+                    <div>
+                      <div className="city-dialog-row-title">{BUILDING_NAMES[item.buildingType] ?? `建筑类型 ${item.buildingType}`}</div>
+                      <div className="city-dialog-row-meta">
+                        目标等级 {item.targetLevel} · 还剩 {formatDuration(Math.max(0, remaining))}
+                      </div>
+                      <div className="city-dialog-progress-bar">
+                        <div className="city-dialog-progress-fill" style={{ width: `${progress}%` }} />
+                      </div>
                     </div>
+                    <Button
+                      disabled={cancelingQueueId === item.id}
+                      onClick={() => void handleCancelBuild(item.id)}
+                      size="small"
+                      variant="danger"
+                    >
+                      {cancelingQueueId === item.id ? '处理中...' : '取消'}
+                    </Button>
                   </div>
-                  <Button
-                    disabled={cancelingQueueId === item.id}
-                    onClick={() => void handleCancelBuild(item.id)}
-                    size="small"
-                    variant="secondary"
-                  >
-                    {cancelingQueueId === item.id ? '处理中...' : '取消'}
-                  </Button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -267,19 +386,14 @@ export default function CityDialog() {
               {completedQueue.map((item) => (
                 <div key={`completed-${item.id}-${item.finishTime}`} className="city-dialog-row-card city-dialog-row-card-static">
                   <div>
-                    <div className="city-dialog-row-title">队列 #{item.id}</div>
-                    <div className="city-dialog-row-meta">建筑类型 {item.buildingType} · 目标等级 {item.targetLevel}</div>
+                    <div className="city-dialog-row-title">{BUILDING_NAMES[item.buildingType] ?? `建筑类型 ${item.buildingType}`}</div>
+                    <div className="city-dialog-row-meta">目标等级 {item.targetLevel}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
-
-        <div className="city-dialog-section">
-          <div className="city-dialog-section-title">当前范围</div>
-          <div className="city-dialog-note">当前城建面板仅实现 SDK 已支持的城池信息、建筑升级、建造队列、取消建造、资源产出能力。</div>
-        </div>
 
         {actionStatus && <div className="city-dialog-status">{actionStatus}</div>}
       </div>

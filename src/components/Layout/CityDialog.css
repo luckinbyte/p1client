@@ -110,6 +110,94 @@
   color: #e2e8f0;
 }
 
+/* Unbuilt building row - greyed out */
+.city-dialog-row-card-unbuilt {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.city-dialog-unbuilt-badge {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+/* Inline error message */
+.city-dialog-inline-error {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  font-size: 13px;
+}
+
+/* Confirmation modal styles */
+.city-dialog-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 320px;
+}
+
+.city-dialog-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.city-dialog-confirm-label {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.city-dialog-confirm-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.city-dialog-confirm-insufficient {
+  color: #fca5a5;
+}
+
+.city-dialog-confirm-section {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.city-dialog-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* Progress bar for build queue */
+.city-dialog-progress-bar {
+  margin-top: 6px;
+  height: 4px;
+  background: #1e293b;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.city-dialog-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
 .city-dialog-list {
   margin: 0;
   padding-left: 18px;

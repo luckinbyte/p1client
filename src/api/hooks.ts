@@ -15,6 +15,7 @@ export function usePushHandlers() {
   const setRoleInfo = useGameStore((state) => state.setRoleInfo)
   const addEventLog = useGameStore((state) => state.addEventLog)
   const updateResources = useGameStore((state) => state.updateResources)
+  const setCityInfo = useGameStore((state) => state.setCityInfo)
 
   const refreshSoldierState = async () => {
     const [soldiersResponse, trainQueueResponse, healQueueResponse] = await Promise.all([
@@ -121,6 +122,22 @@ export function usePushHandlers() {
       void refreshSoldierState()
     })
 
+    const unsubscribeBuildComplete = gameClient.ws.on(PushMsgID.BuildComplete, (data) => {
+      const payload = data as { building_type?: number; target_level?: number; queue_id?: number }
+      const buildingType = payload.building_type ?? 0
+      const targetLevel = payload.target_level ?? 0
+      addEventLog(`建造完成：建筑类型 ${buildingType} 升至等级 ${targetLevel}`)
+      void (async () => {
+        const cityResponse = await gameClient.api.getCityInfo()
+        if (cityResponse.code === 0 && cityResponse.data) {
+          const cityData = (cityResponse.data as { city?: CityData }).city
+          if (cityData) {
+            setCityInfo(cityData)
+          }
+        }
+      })()
+    })
+
     // 资源推送监听：服务端资源更新 push (msgId=1003) 无专用 handler，
     // 通过 onPush 全局回调接收并更新 resources store
     gameClient.ws.onPush = (raw) => {
@@ -151,6 +168,7 @@ export function usePushHandlers() {
       unsubscribeBattleEnd()
       unsubscribeTrainComplete()
       unsubscribeHealComplete()
+      unsubscribeBuildComplete()
     }
   }, [
     addSceneObject,
@@ -163,6 +181,7 @@ export function usePushHandlers() {
     setTrainQueue,
     updateResources,
     updateSceneObjectPosition,
+    setCityInfo,
   ])
 }
 
