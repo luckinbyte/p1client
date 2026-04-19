@@ -244,44 +244,59 @@ export class WSClient {
       const view = new Uint8Array(buf);
       if (view.length < 1) return;
 
-      // 检查是否有长度前缀（4字节）
-      // 注意：握手响应没有长度前缀，格式为 [0x02, 0x00, 0x00, 0x00, 0x00]
-      let offset = 0;
-      if (view.length >= 4 && !(view[0] === 0x02 && view.length === 5)) {
-        // 读取长度前缀（4字节）
-        const length = (view[0] << 24) | (view[1] << 16) | (view[2] << 8) | view[3];
-        offset = 4;
-        console.log('[WS] received message with length prefix:', length);
+      // --- Handshake detection (INTG-01) ---
+      // When not connected, the first message is always the handshake response.
+      if (!this.isConnected) {
+        console.log('[WS] handshake response received, connection established');
+        this.isConnected = true;
+        this.reconnectAttempts = 0;
+        this.startHeartbeat();
+        this.onConnected?.();
+        if (this.connectTimeout) {
+          clearTimeout(this.connectTimeout);
+          this.connectTimeout = null;
+        }
+        if (this.connectResolve) {
+          this.connectResolve();
+          this.connectResolve = null;
+          this.connectReject = null;
+        }
+        return;
       }
 
-      if (offset >= view.length) return;
+      // --- Length prefix stripping ---
+      let offset = 0;
+      let msgType = view[0];
 
-      const msgType = view[offset];
-      console.log('[WS] received binary message, type=', msgType, 'length=', view.length, 'offset=', offset, 'hex=', Array.from(view.slice(offset, offset + 10)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      // Check for length-prefix framed messages:
+      // If we have 5+ bytes and byte 4 is a valid MsgType (0x02 or 0x03), assume framed.
+      if (view.length >= 5 && (view[4] === MsgType.Response || view[4] === MsgType.Push)) {
+        const length = (view[0] << 24) | (view[1] << 16) | (view[2] << 8) | view[3];
+        if (length >= 1 && length <= view.length - 4) {
+          offset = 4;
+          msgType = view[offset];
+        }
+      }
+
+      console.log('[WS] received message, msgType=', msgType, 'length=', view.length, 'offset=', offset, 'hex=', Array.from(view.slice(offset, offset + 10)).map(b => b.toString(16).padStart(2, '0')).join(' '));
 
       if (msgType === MsgType.Response) {
-        // 服务端响应格式: [Length(4B)][MsgType(0x02)][JSON payload]
-        // 注意：服务端响应不包含 MsgID 字段
-
-        if (!this.isConnected) {
-          console.log('[WS] handshake response received, connection established');
-          this.isConnected = true;
-          this.reconnectAttempts = 0;
-          this.startHeartbeat();
-          this.onConnected?.();
-          if (this.connectTimeout) {
-            clearTimeout(this.connectTimeout);
-            this.connectTimeout = null;
+        // Framed response: [Length(4B)][0x02][JSON payload]
+        let response: ApiResponse;
+        if (view.length > offset + 1) {
+          const payloadStr = decodeUtf8(view.slice(offset + 1));
+          console.log('[WS] response payload:', payloadStr);
+          try {
+            response = JSON.parse(payloadStr) as ApiResponse;
+          } catch {
+            // Not JSON — could be protobuf-encoded response (per D-09, D-10)
+            response = { code: 0, message: 'ok' };
           }
-          if (this.connectResolve) {
-            this.connectResolve();
-            this.connectResolve = null;
-            this.connectReject = null;
-          }
-          return;
+        } else {
+          response = { code: 0, message: 'ok' };
         }
 
-        // 使用 FIFO 匹配请求（因为服务端响应没有 MsgID/RID 字段）
+        // FIFO matching (server responses don't include MsgID/RID)
         let matchedCallback: RequestCallback | undefined;
         for (const [, callback] of this.pendingRequests.entries()) {
           matchedCallback = callback;
@@ -291,35 +306,47 @@ export class WSClient {
         if (matchedCallback) {
           clearTimeout(matchedCallback.timeout);
           this.pendingRequests.delete(Array.from(this.pendingRequests.keys())[0]);
-
-          let response: ApiResponse;
-          // payload 紧跟 MsgType 之后，即 view.slice(offset + 1)
-          if (view.length > offset + 1) {
-            const payloadStr = decodeUtf8(view.slice(offset + 1));
-            console.log('[WS] response payload:', payloadStr);
-            try {
-              response = JSON.parse(payloadStr) as ApiResponse;
-            } catch {
-              response = { code: 0, message: 'ok', data: payloadStr };
-            }
-          } else {
-            response = { code: 0, message: 'ok' };
-          }
-
           matchedCallback.resolve(response);
           return;
         }
 
-        console.warn('Received response for unknown request');
+        console.warn('[WS] received response for unknown request');
+        return;
+      }
+
+      // Handle unframed protobuf responses (heartbeat)
+      if (msgType !== MsgType.Push) {
+        console.log('[WS] received unframed response (likely heartbeat protobuf), treating as ack');
+        let matchedCallback: RequestCallback | undefined;
+        for (const [, callback] of this.pendingRequests.entries()) {
+          matchedCallback = callback;
+          break;
+        }
+
+        if (matchedCallback) {
+          clearTimeout(matchedCallback.timeout);
+          this.pendingRequests.delete(Array.from(this.pendingRequests.keys())[0]);
+          matchedCallback.resolve({ code: 0, message: 'ok' });
+          return;
+        }
+        return;
       }
 
       if (msgType === MsgType.Push) {
-        // 服务端推送格式: [Length(4B)][MsgType(0x03)][JSON payload]
-        // 推送不包含 MsgID，与响应格式一致
+        // Server push format: [Length(4B)][MsgType(0x03)][MsgID(2B)][JSON payload]
+        let pushMsgId = 0;
+        let pushDataStart = offset + 1;
+
+        // Extract 2-byte msgId from push payload
+        if (view.length >= offset + 3) {
+          pushMsgId = (view[offset + 1] << 8) | view[offset + 2];
+          pushDataStart = offset + 3;
+        }
+
         let pushData: unknown = {};
-        if (view.length > offset + 1) {
-          const payloadStr = decodeUtf8(view.slice(offset + 1));
-          console.log('[WS] push payload:', payloadStr);
+        if (view.length > pushDataStart) {
+          const payloadStr = decodeUtf8(view.slice(pushDataStart));
+          console.log('[WS] push payload: msgId=', pushMsgId, 'data=', payloadStr);
           try {
             pushData = JSON.parse(payloadStr);
           } catch {
@@ -327,11 +354,20 @@ export class WSClient {
           }
         }
 
-        // 调用全局推送回调
-        this.onPush?.(pushData);
+        // Dispatch to per-type handlers registered via ws.on(pushMsgId, callback)
+        const handlers = this.eventHandlers.get(pushMsgId);
+        if (handlers) {
+          for (const handler of handlers) {
+            try {
+              handler(pushData);
+            } catch (err) {
+              console.error(`[WS] push handler error for msgId=${pushMsgId}:`, err);
+            }
+          }
+        }
 
-        // 兼容旧的 msgId 匹配逻辑（已失效，保留不删）
-        // 由于推送无 MsgID，下方逻辑不会匹配到任何 handler
+        // Call global push callback as fallback
+        this.onPush?.(pushData);
       }
     } catch (error) {
       console.error('Failed to parse message:', error);
