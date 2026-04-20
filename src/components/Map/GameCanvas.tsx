@@ -5,9 +5,11 @@ import { CameraController } from '@/game/CameraController'
 import { EntityRenderer } from '@/game/EntityRenderer'
 import { GameScene } from '@/game/GameScene'
 import { MapRenderer } from '@/game/MapRenderer'
+import { MarchPathRenderer } from '@/game/MarchPathRenderer'
 import { SelectionManager } from '@/game/SelectionManager'
-import { EntityType, ResourceType } from '@/sdk'
-import { RESOURCE_TYPE_MAP } from '@/utils/constants'
+import { ArmyStatus, EntityType, ResourceType } from '@/sdk'
+import { MAP_CONFIG, RESOURCE_TYPE_MAP } from '@/utils/constants'
+import { gameToThree } from '@/utils/helpers'
 import './GameCanvas.css'
 
 export default function GameCanvas() {
@@ -17,11 +19,14 @@ export default function GameCanvas() {
     mapRenderer: MapRenderer
     cameraController: CameraController
     entityRenderer: EntityRenderer
+    marchPathRenderer: MarchPathRenderer
     selectionManager: SelectionManager
     unsubscribeSelection: () => void
     unsubscribeGroundClick: () => void
   } | null>(null)
   const sceneObjects = useGameStore((state) => state.sceneObjects)
+  const armies = useGameStore((state) => state.armies)
+  const roleInfo = useGameStore((state) => state.roleInfo)
   const isConnected = useGameStore((state) => state.isConnected)
   const selectedEntity = useGameStore((state) => state.selectedEntity)
   const selectedPosition = useGameStore((state) => state.selectedPosition)
@@ -39,6 +44,7 @@ export default function GameCanvas() {
     const cameraController = new CameraController(scene)
     const entityRenderer = new EntityRenderer(scene.getEntityGroup())
     const selectionManager = new SelectionManager(scene, entityRenderer)
+    const marchPathRenderer = new MarchPathRenderer(scene.getUiGroup())
     const unsubscribeSelection = selectionManager.onSelectionChange((entity) => {
       setSelectedEntity(entity)
       if (entity) {
@@ -71,11 +77,26 @@ export default function GameCanvas() {
     mapRenderer.render()
     scene.start()
 
+    scene.onAnimate = () => {
+      const currentArmies = useGameStore.getState().armies
+      for (const army of currentArmies) {
+        if (army.status === ArmyStatus.Marching && army.march) {
+          const entity = entityRenderer.getEntity(army.id)
+          if (entity) {
+            const pos = gameToThree(army.position, MAP_CONFIG.width, MAP_CONFIG.height)
+            entity.position.x += (pos.x - entity.position.x) * 0.15
+            entity.position.z += (pos.z - entity.position.z) * 0.15
+          }
+        }
+      }
+    }
+
     gameRef.current = {
       scene,
       mapRenderer,
       cameraController,
       entityRenderer,
+      marchPathRenderer,
       selectionManager,
       unsubscribeSelection,
       unsubscribeGroundClick,
@@ -90,8 +111,10 @@ export default function GameCanvas() {
       gameRef.current.unsubscribeGroundClick()
       gameRef.current.selectionManager.dispose()
       gameRef.current.entityRenderer.dispose()
+      gameRef.current.marchPathRenderer.dispose()
       gameRef.current.cameraController.dispose()
       gameRef.current.mapRenderer.dispose()
+      gameRef.current.scene.onAnimate = null
       gameRef.current.scene.dispose()
       gameRef.current = null
       setSelectedEntity(null)
@@ -113,6 +136,24 @@ export default function GameCanvas() {
       selectionManager.clearSelection()
     }
   }, [sceneObjects])
+
+  useEffect(() => {
+    if (!gameRef.current || !roleInfo) return
+    gameRef.current.entityRenderer.setCurrentPlayerId(roleInfo.rid)
+  }, [roleInfo])
+
+  useEffect(() => {
+    if (!gameRef.current) return
+    const { marchPathRenderer } = gameRef.current
+    const currentRoleId = roleInfo?.rid
+
+    marchPathRenderer.clear()
+    for (const army of armies) {
+      if (army.status !== ArmyStatus.Marching || !army.march) continue
+      if (currentRoleId != null && army.ownerId !== currentRoleId) continue
+      marchPathRenderer.createPath(army.id, army.position, army.march.targetPos)
+    }
+  }, [armies, roleInfo])
 
   const targetTitle = useMemo(() => {
     if (!selectedEntity) {

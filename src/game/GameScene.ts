@@ -11,6 +11,7 @@ export class GameScene {
   private mapGroup: THREE.Group
   private entityGroup: THREE.Group
   private uiGroup: THREE.Group
+  public onAnimate: (() => void) | null = null
   private readonly handleResize = () => {
     const width = this.container.clientWidth
     const height = this.container.clientHeight || 1
@@ -102,6 +103,7 @@ export class GameScene {
     }
 
     this.animationId = requestAnimationFrame(this.animate)
+    this.onAnimate?.()
     this.renderer.render(this.scene, this.camera)
   }
 
