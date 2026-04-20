@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { gameClient } from '@/api/client'
 import { fetchArmyState } from '@/api/hooks'
 import { useGameStore } from '@/api/store'
 import { Button } from '@/components/common/Button'
 import { ArmyStatus, EntityType, MarchType, ResourceType } from '@/sdk'
 import { RESOURCE_TYPE_MAP } from '@/utils/constants'
+import { formatTime } from '@/utils/helpers'
 import './SidePanel.css'
 
 const MARCH_TYPE_VALUE = {
@@ -38,7 +39,15 @@ export default function SidePanel() {
     clearEventLogs,
     addEventLog,
   } = useGameStore()
+  const roleInfo = useGameStore((state) => state.roleInfo)
   const [actionStatus, setActionStatus] = useState('')
+
+  // 1-second tick timer for live countdown
+  const [now, setNow] = useState(Math.floor(Date.now() / 1000))
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const primaryArmy = useMemo(
     () => armies.find((army) => army.id === selectedArmyId) ?? armies[0] ?? null,
@@ -143,6 +152,39 @@ export default function SidePanel() {
     }
   }, [selectedEntity, selectedPosition])
 
+  // Resource detail for selected resource point (D-06)
+  const resourceDetail = useMemo(() => {
+    if (!selectedEntity || selectedEntity.type !== EntityType.Resource) return null
+    const config = RESOURCE_TYPE_MAP[selectedEntity.resourceType ?? ResourceType.Food] ?? RESOURCE_TYPE_MAP[1]
+    const amount = selectedEntity.resourceAmount ?? 0
+    const totalSoldiers = primaryArmy
+      ? Object.values(primaryArmy.soldiers).reduce((sum, count) => sum + count, 0)
+      : 0
+    const estimatedYield = Math.min(totalSoldiers * 100, amount)
+    const isOccupied = selectedEntity.ownerId != null && selectedEntity.ownerId !== roleInfo?.rid
+    return { config, amount, estimatedYield, isOccupied }
+  }, [selectedEntity, primaryArmy, roleInfo])
+
+  // March info for selected army (D-02)
+  const marchInfo = useMemo(() => {
+    if (!primaryArmy || primaryArmy.status !== ArmyStatus.Marching || !primaryArmy.march) return null
+    const remaining = Math.max(0, primaryArmy.march.arrivalTime - now)
+    const total = primaryArmy.march.arrivalTime - primaryArmy.march.startTime
+    const progress = total > 0 ? Math.min(1, (total - remaining) / total) : 0
+    return { remaining, progress, targetPos: primaryArmy.march.targetPos }
+  }, [primaryArmy, now])
+
+  // Collection info for selected army (D-04)
+  const collectInfo = useMemo(() => {
+    if (!primaryArmy || primaryArmy.status !== ArmyStatus.Collecting || !primaryArmy.march?.collectEndTime) return null
+    const remaining = Math.max(0, primaryArmy.march.collectEndTime - now)
+    const total = primaryArmy.march.collectEndTime - primaryArmy.march.arrivalTime
+    const progress = total > 0 ? Math.min(1, (total - remaining) / total) : 0
+    const totalSoldiers = Object.values(primaryArmy.soldiers).reduce((sum, count) => sum + count, 0)
+    const estimatedYield = totalSoldiers * 100
+    return { remaining, progress, estimatedYield }
+  }, [primaryArmy, now])
+
   return (
     <aside className="side-panel">
       <section className="panel-section">
@@ -237,10 +279,65 @@ export default function SidePanel() {
             <span className="target-value">{targetSummary}</span>
           </div>
           <div className="target-detail">{targetDetail}</div>
+
+          {/* Resource detail view per D-06 */}
+          {resourceDetail && (
+            <div className="resource-detail">
+              <div className="info-row">
+                <span>资源类型</span>
+                <span>{resourceDetail.config.icon} {resourceDetail.config.name}</span>
+              </div>
+              <div className="info-row">
+                <span>剩余储量</span>
+                <span>{resourceDetail.amount}</span>
+              </div>
+              <div className="info-row">
+                <span>预估采集</span>
+                <span className="yield-value">{resourceDetail.estimatedYield}</span>
+              </div>
+              {resourceDetail.isOccupied && (
+                <div className="occupied-warning">已被占用</div>
+              )}
+            </div>
+          )}
+
+          {/* March info per D-02 */}
+          {marchInfo && (
+            <div className="march-info">
+              <div className="info-row">
+                <span>目标坐标</span>
+                <span>({marchInfo.targetPos.x}, {marchInfo.targetPos.y})</span>
+              </div>
+              <div className="info-row">
+                <span>剩余时间</span>
+                <span className="eta-value">{formatTime(marchInfo.remaining)}</span>
+              </div>
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: `${marchInfo.progress * 100}%` }} />
+              </div>
+            </div>
+          )}
+
+          {/* Collection countdown per D-04 */}
+          {collectInfo && (
+            <div className="collect-info">
+              <div className="info-row">
+                <span>采集倒计时</span>
+                <span className="eta-value">{formatTime(collectInfo.remaining)}</span>
+              </div>
+              <div className="info-row">
+                <span>预估采集量</span>
+                <span className="yield-value">{collectInfo.estimatedYield}</span>
+              </div>
+              <div className="progress-bar">
+                <div className="progress-fill collecting" style={{ width: `${collectInfo.progress * 100}%` }} />
+              </div>
+            </div>
+          )}
         </div>
         <div className="panel-buttons march-actions">
           <Button
-            disabled={!primaryArmy || !canMarch || !selectedEntity || selectedEntity.type !== EntityType.Resource}
+            disabled={!primaryArmy || !canMarch || !selectedEntity || selectedEntity.type !== EntityType.Resource || !!resourceDetail?.isOccupied}
             onClick={() => void handleMarchAction('collect')}
             variant="secondary"
           >

@@ -142,3 +142,63 @@
   font-size: 13px;
   color: #93c5fd;
 }
+
+/* Resource detail view */
+.resource-detail {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.yield-value {
+  color: #86efac;
+  font-weight: 600;
+}
+
+.occupied-warning {
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 6px;
+  text-align: center;
+}
+
+/* March and collection info */
+.march-info,
+.collect-info {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.eta-value {
+  color: #93c5fd;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-bar {
+  margin-top: 8px;
+  height: 6px;
+  background: #1e293b;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #93c5fd;
+  border-radius: 3px;
+  transition: width 1s linear;
+}
+
+.progress-fill.collecting {
+  background: #86efac;
+}
