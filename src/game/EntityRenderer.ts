@@ -15,9 +15,14 @@ interface EntityObject extends THREE.Group {
 export class EntityRenderer {
   private entityGroup: THREE.Group
   private entities = new Map<number, EntityObject>()
+  private currentPlayerId: bigint | null = null
 
   constructor(entityGroup: THREE.Group) {
     this.entityGroup = entityGroup
+  }
+
+  setCurrentPlayerId(roleId: bigint): void {
+    this.currentPlayerId = roleId
   }
 
   addEntity(entity: SceneObject): EntityObject {
@@ -115,7 +120,8 @@ export class EntityRenderer {
 
   private createPlayerMesh(entity: SceneObject): THREE.Group {
     const group = new THREE.Group()
-    const color = entity.ownerId ? COLORS.friendly : COLORS.neutral
+    const isOwn = this.currentPlayerId != null && entity.ownerId === this.currentPlayerId
+    const color = isOwn ? COLORS.friendly : COLORS.enemy
 
     const marker = new THREE.Mesh(
       new THREE.ConeGeometry(0.35, 1.2, 5),
