@@ -4,7 +4,7 @@ import { useGameStore } from '@/api/store'
 import { fetchArmyState } from '@/api/hooks'
 import { Button } from '@/components/common/Button'
 import { Modal } from '@/components/common/Modal'
-import { ArmyStatus, soldierConfig, type SoldierData } from '@/sdk'
+import { type ArmyData, ArmyStatus, MarchType, soldierConfig, type SoldierData } from '@/sdk'
 import './ArmyDialog.css'
 
 const STATUS_LABEL: Record<ArmyStatus, string> = {
@@ -13,6 +13,17 @@ const STATUS_LABEL: Record<ArmyStatus, string> = {
   [ArmyStatus.Collecting]: '采集中',
   [ArmyStatus.Battle]: '战斗中',
   [ArmyStatus.Stationing]: '驻扎中',
+}
+
+function isReturnMarch(army: ArmyData): boolean {
+  return army.status === ArmyStatus.Marching && army.march?.type === MarchType.Return
+}
+
+function getArmyStatusLabel(army: ArmyData): string {
+  if (isReturnMarch(army)) {
+    return '返回中'
+  }
+  return STATUS_LABEL[army.status]
 }
 
 const MAX_ARMY_COUNT = 5
@@ -273,7 +284,8 @@ export default function ArmyDialog() {
               {armies.map((army) => {
                 const totalUnits = getTotalUnits(army.soldiers)
                 const isSelected = selectedArmy?.id === army.id
-                const canCancelMarch = army.status === ArmyStatus.Marching || army.status === ArmyStatus.Collecting
+                const isReturning = isReturnMarch(army)
+                const canCancelMarch = !isReturning && (army.status === ArmyStatus.Marching || army.status === ArmyStatus.Collecting)
                 const canDisband = army.status === ArmyStatus.Idle
                 const composition = Object.entries(army.soldiers)
                   .map(([soldierId, count]) => `${configMap.get(Number(soldierId))?.name ?? `士兵 ${soldierId}`} x${count}`)
@@ -291,8 +303,14 @@ export default function ArmyDialog() {
                     >
                       <div className="army-card-header">
                         <span className="army-card-title">军队 #{army.id}</span>
-                        <span className={army.status === ArmyStatus.Idle ? 'army-card-status idle' : 'army-card-status'}>
-                          {STATUS_LABEL[army.status]}
+                        <span className={
+                          army.status === ArmyStatus.Idle
+                            ? 'army-card-status idle'
+                            : isReturnMarch(army)
+                              ? 'army-card-status returning'
+                              : 'army-card-status'
+                        }>
+                          {getArmyStatusLabel(army)}
                         </span>
                       </div>
                       <div className="army-card-grid">
@@ -323,6 +341,7 @@ export default function ArmyDialog() {
                         onClick={() => void handleCancelMarch(army.id)}
                         size="small"
                         variant="secondary"
+                        title={isReturning ? '军队正在返回中' : undefined}
                       >
                         {submittingArmyId === army.id && canCancelMarch ? '处理中...' : '取消行军'}
                       </Button>
@@ -331,6 +350,7 @@ export default function ArmyDialog() {
                         onClick={() => void handleDisbandArmy(army.id)}
                         size="small"
                         variant="danger"
+                        title={!canDisband && army.status !== ArmyStatus.Idle ? getArmyStatusLabel(army) + '中无法解散' : undefined}
                       >
                         {submittingArmyId === army.id && canDisband ? '处理中...' : '解散'}
                       </Button>

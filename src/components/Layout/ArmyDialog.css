@@ -1,15 +1,55 @@
+.army-dialog-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.army-dialog-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.army-dialog-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.army-dialog-section-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.army-dialog-section-header span {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
 .army-dialog-empty {
   text-align: center;
   color: #94a3b8;
   font-size: 14px;
+  padding: 20px 12px;
+  border: 1px dashed #334155;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.45);
 }
 
+.army-create-list,
 .army-dialog-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
+.army-create-card,
 .army-card {
   width: 100%;
   border: 1px solid #334155;
@@ -17,6 +57,82 @@
   background: #0f172a;
   color: #e2e8f0;
   padding: 14px;
+}
+
+.army-create-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+
+.army-create-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.army-create-meta {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.army-create-input-wrap {
+  width: 108px;
+  flex-shrink: 0;
+}
+
+.army-create-input {
+  width: 100%;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #020617;
+  color: #e2e8f0;
+  padding: 9px 10px;
+  font-size: 14px;
+}
+
+.army-create-input:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.35);
+}
+
+.army-create-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.army-create-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.army-create-summary strong {
+  color: #f8fafc;
+  font-size: 20px;
+}
+
+.army-create-summary span {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.army-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .army-card-select {
@@ -75,19 +191,56 @@
   font-size: 14px;
 }
 
+.army-card-composition {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
 .army-card-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   margin-top: 12px;
+  flex-wrap: wrap;
 }
 
 .army-dialog-status {
+  grid-column: 1 / -1;
   font-size: 13px;
   color: #93c5fd;
+}
+
+@media (max-width: 900px) {
+  .army-dialog-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
   .army-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .army-create-card,
+  .army-create-footer,
+  .army-dialog-section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .army-create-input-wrap {
+    width: 100%;
+  }
+
+  .army-create-actions,
+  .army-card-actions {
+    justify-content: stretch;
+  }
+
+  .army-create-actions > *,
+  .army-card-actions > * {
+    width: 100%;
   }
 }

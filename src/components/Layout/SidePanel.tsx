@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { gameClient } from '@/api/client'
+import { fetchArmyState } from '@/api/hooks'
 import { useGameStore } from '@/api/store'
 import { Button } from '@/components/common/Button'
 import { ArmyStatus, EntityType, ResourceType } from '@/sdk'
@@ -24,7 +25,9 @@ export default function SidePanel() {
     armies,
     selectedArmyId,
     setSelectedArmyId,
+    setArmies,
     soldiers,
+    setSoldiers,
     selectedEntity,
     selectedPosition,
     eventLogs,
@@ -38,6 +41,12 @@ export default function SidePanel() {
     [armies, selectedArmyId],
   )
   const canMarch = primaryArmy?.status === ArmyStatus.Idle
+
+  const refreshArmyPanelState = async () => {
+    const battleState = await fetchArmyState()
+    setArmies(battleState.armies)
+    setSoldiers(battleState.soldiers)
+  }
 
   const handleMarchAction = async (action: keyof typeof MARCH_TYPE_VALUE) => {
     if (!primaryArmy || !selectedEntity) {
@@ -56,6 +65,7 @@ export default function SidePanel() {
         setActionStatus(response.message || '行军失败')
         return
       }
+      await refreshArmyPanelState()
       addEventLog(`军队 #${primaryArmy.id} 已下达${ACTION_LABEL[action]}指令，目标 #${selectedEntity.id}`)
       setActionStatus(`已发送${ACTION_LABEL[action]}指令`)
     } catch (error) {
