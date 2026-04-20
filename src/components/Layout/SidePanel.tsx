@@ -3,7 +3,7 @@ import { gameClient } from '@/api/client'
 import { fetchArmyState } from '@/api/hooks'
 import { useGameStore } from '@/api/store'
 import { Button } from '@/components/common/Button'
-import { ArmyStatus, EntityType, ResourceType } from '@/sdk'
+import { ArmyStatus, EntityType, MarchType, ResourceType } from '@/sdk'
 import { RESOURCE_TYPE_MAP } from '@/utils/constants'
 import './SidePanel.css'
 
@@ -18,6 +18,10 @@ const ACTION_LABEL = {
   attack: '攻击',
   reinforce: '支援',
 } as const
+
+function isReturnMarch(army: { status: ArmyStatus; march?: { type?: string } }): boolean {
+  return army.status === ArmyStatus.Marching && army.march?.type === MarchType.Return
+}
 
 export default function SidePanel() {
   const {
@@ -81,18 +85,15 @@ export default function SidePanel() {
     [soldiers],
   )
 
-  const armyStatusLabel =
-    primaryArmy?.status === ArmyStatus.Marching
-      ? '行军中'
-      : primaryArmy?.status === ArmyStatus.Collecting
-        ? '采集中'
-        : primaryArmy?.status === ArmyStatus.Battle
-          ? '战斗中'
-          : primaryArmy?.status === ArmyStatus.Stationing
-            ? '驻扎中'
-            : primaryArmy
-              ? '空闲'
-              : '暂无'
+  const armyStatusLabel = useMemo(() => {
+    if (!primaryArmy) return '暂无'
+    if (isReturnMarch(primaryArmy)) return '返回中'
+    if (primaryArmy.status === ArmyStatus.Collecting) return '采集中'
+    if (primaryArmy.status === ArmyStatus.Battle) return '战斗中'
+    if (primaryArmy.status === ArmyStatus.Stationing) return '驻扎中'
+    if (primaryArmy.status === ArmyStatus.Marching) return '行军中'
+    return '空闲'
+  }, [primaryArmy])
 
   const targetSummary = useMemo(() => {
     if (!selectedEntity) {
@@ -223,7 +224,7 @@ export default function SidePanel() {
                 ) : (
                   armies.map((army) => (
                     <option key={army.id} value={army.id}>
-                      #{army.id} · {army.status === ArmyStatus.Idle ? '空闲' : '忙碌'}
+                      #{army.id} · {isReturnMarch(army) ? '返回中' : army.status === ArmyStatus.Idle ? '空闲' : '忙碌'}
                     </option>
                   ))
                 )}

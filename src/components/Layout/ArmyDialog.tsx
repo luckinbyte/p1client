@@ -278,7 +278,7 @@ export default function ArmyDialog() {
           </div>
 
           {armies.length === 0 ? (
-            <div className="army-dialog-empty">暂无军队</div>
+            <div className="army-dialog-empty">暂无军队，请从上方编组区创建</div>
           ) : (
             <div className="army-dialog-list">
               {armies.map((army) => {
