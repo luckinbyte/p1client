@@ -1,7 +1,8 @@
 import { useCallback, useEffect } from 'react'
 import { gameClient } from '@/api/client'
 import { useGameStore } from '@/api/store'
-import { PushMsgID, type ArmyData, type CityData, type MarchData, type RoleInfo, type SceneObject, type SoldierData, type TrainQueueItem } from '@/sdk'
+import { EntityType, PushMsgID, type ArmyData, type CityData, type MarchData, type RoleInfo, type SceneObject, type SoldierData, type TrainQueueItem } from '@/sdk'
+import { RESOURCE_TYPE_MAP } from '@/utils/constants'
 
 type RawTrainQueueItem = {
   id?: number
@@ -342,7 +343,12 @@ export function usePushHandlers() {
     const unsubscribeSceneEnter = gameClient.ws.on(PushMsgID.SceneEnter, (data) => {
       const sceneObject = data as SceneObject
       addSceneObject(sceneObject)
-      addEventLog(`场景进入：目标 #${sceneObject.id}`)
+      const typeLabel = sceneObject.type === EntityType.Resource
+        ? `${RESOURCE_TYPE_MAP[sceneObject.resourceType ?? 1]?.name ?? '资源'}点`
+        : sceneObject.type === EntityType.City ? '城池'
+        : sceneObject.type === EntityType.Player ? '玩家部队'
+        : '目标'
+      addEventLog(`场景进入：${typeLabel} #${sceneObject.id}`)
     })
 
     const unsubscribeSceneLeave = gameClient.ws.on(PushMsgID.SceneLeave, (data) => {
@@ -357,22 +363,57 @@ export function usePushHandlers() {
     const unsubscribeSceneUpdate = gameClient.ws.on(PushMsgID.SceneUpdate, (data) => {
       const sceneObject = data as SceneObject
       addSceneObject(sceneObject)
-      addEventLog(`场景更新：目标 #${sceneObject.id}`)
+      // No event log -- SceneUpdate fires frequently for position ticks
     })
 
-    const handleMarchPosition = (label: string) => (data: unknown) => {
-      const payload = data as { id?: number; objectId?: number; position?: { x: number; y: number } }
+    const handleMarchStart = (data: unknown) => {
+      const payload = data as { id?: number; objectId?: number; position?: { x: number; y: number }; target_id?: number; targetId?: number }
       const objectId = payload.id ?? payload.objectId
       if (typeof objectId === 'number' && payload.position) {
         updateSceneObjectPosition(objectId, payload.position)
-        addEventLog(`${label}：军队 #${objectId} -> (${payload.position.x}, ${payload.position.y})`)
+        const targetId = payload.target_id ?? payload.targetId ?? 0
+        addEventLog(`行军开始：军队 #${objectId} -> 目标 #${targetId}`)
         void refreshBattleState()
       }
     }
 
-    const handleMarchStart = handleMarchPosition('开始行军')
-    const handleMarchArrive = handleMarchPosition('到达目标')
-    const handleMarchReturn = handleMarchPosition('返回行军')
+    const handleMarchArrive = (data: unknown) => {
+      const payload = data as { id?: number; objectId?: number; position?: { x: number; y: number } }
+      const objectId = payload.id ?? payload.objectId
+      if (typeof objectId === 'number' && payload.position) {
+        updateSceneObjectPosition(objectId, payload.position)
+        addEventLog(`到达目标：军队 #${objectId}`)
+        void refreshBattleState()
+      }
+    }
+
+    const handleMarchReturn = (data: unknown) => {
+      const payload = data as { id?: number; objectId?: number; position?: { x: number; y: number } }
+      const objectId = payload.id ?? payload.objectId
+      if (typeof objectId === 'number') {
+        if (payload.position) {
+          updateSceneObjectPosition(objectId, payload.position)
+        }
+        addEventLog(`返回完成：军队 #${objectId}`)
+        void refreshBattleState()
+
+        // After army state refreshes, check for collected resources (D-05)
+        void (async () => {
+          const state = await fetchArmyState()
+          const army = state.armies.find((a) => a.id === objectId)
+          if (army?.load) {
+            const parts: string[] = []
+            if (army.load.food > 0) parts.push(`粮食 +${army.load.food}`)
+            if (army.load.wood > 0) parts.push(`木材 +${army.load.wood}`)
+            if (army.load.stone > 0) parts.push(`石材 +${army.load.stone}`)
+            if (army.load.gold > 0) parts.push(`金币 +${army.load.gold}`)
+            if (parts.length > 0) {
+              addEventLog(`军队 #${objectId} 采集完毕：${parts.join('、')}`)
+            }
+          }
+        })()
+      }
+    }
 
     const unsubscribeMarchStart = gameClient.ws.on(PushMsgID.MarchStart, handleMarchStart)
     const unsubscribeMarchArrive = gameClient.ws.on(PushMsgID.MarchArrive, handleMarchArrive)
