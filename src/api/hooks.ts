@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { gameClient } from '@/api/client'
 import { useGameStore } from '@/api/store'
-import { PushMsgID, type ArmyData, type CityData, type SceneObject, type TrainQueueItem } from '@/sdk'
+import { PushMsgID, type ArmyData, type CityData, type MarchData, type RoleInfo, type SceneObject, type SoldierData, type TrainQueueItem } from '@/sdk'
 
 type RawTrainQueueItem = {
   id?: number
@@ -17,6 +17,58 @@ type RawTrainQueueItem = {
   finish_time?: number
   isUpgrade?: boolean
   is_upgrade?: boolean
+}
+
+type RawMarchData = {
+  type?: string
+  targetId?: number
+  target_id?: number
+  targetPos?: { x?: number; y?: number }
+  target_pos?: { x?: number; y?: number }
+  path?: Array<{ x?: number; y?: number }>
+  startTime?: number
+  start_time?: number
+  arrivalTime?: number
+  arrival_time?: number
+  speed?: number
+  progress?: number
+  collectEndTime?: number
+  collect_end_time?: number
+}
+
+type RawArmyData = {
+  id?: number
+  ownerId?: bigint | number | string
+  owner_id?: bigint | number | string
+  heroId?: number
+  hero_id?: number
+  soldiers?: Record<string, number> | Record<number, number>
+  status?: string
+  position?: { x?: number; y?: number }
+  sceneId?: number
+  scene_id?: number
+  march?: RawMarchData
+  load?: {
+    food?: number
+    wood?: number
+    stone?: number
+    gold?: number
+  }
+}
+
+function normalizeSoldiers(data: unknown): SoldierData[] {
+  if (Array.isArray(data)) {
+    return data as SoldierData[]
+  }
+
+  if (data && typeof data === 'object') {
+    const soldiers = (data as { soldiers?: unknown }).soldiers
+    if (Array.isArray(soldiers)) {
+      return soldiers as SoldierData[]
+    }
+  }
+
+  return []
 }
 
 function normalizeTrainQueueItem(item: unknown): TrainQueueItem | null {
@@ -70,6 +122,174 @@ function normalizeTrainQueue(data: unknown): TrainQueueItem[] {
     .filter((item): item is TrainQueueItem => item !== null)
 }
 
+function normalizeRoleInfo(data: unknown): RoleInfo | null {
+  if (!data || typeof data !== 'object') {
+    return null
+  }
+
+  const raw = data as Record<string, unknown>
+  const rid = raw.rid
+  const name = raw.name
+  const level = raw.level
+  const exp = raw.exp
+  const vip = raw.vip
+
+  if (typeof rid !== 'number') {
+    return null
+  }
+
+  return {
+    rid: BigInt(rid),
+    name: typeof name === 'string' && name.trim().length > 0 ? name : `玩家${rid}`,
+    level: typeof level === 'number' ? level : 1,
+    exp: typeof exp === 'number' ? exp : 0,
+    vip: typeof vip === 'number' ? vip : 0,
+    resources: {
+      food: typeof raw.food === 'number' ? raw.food : 0,
+      wood: typeof raw.wood === 'number' ? raw.wood : 0,
+      stone: typeof raw.stone === 'number' ? raw.stone : 0,
+      gold: typeof raw.gold === 'number' ? raw.gold : 0,
+    },
+    position: { x: 0, y: 0 },
+  }
+}
+
+function normalizeMarchData(data: unknown): MarchData | undefined {
+  if (!data || typeof data !== 'object') {
+    return undefined
+  }
+
+  const raw = data as RawMarchData
+  const type = raw.type
+  const targetId = raw.targetId ?? raw.target_id
+  const targetPos = raw.targetPos ?? raw.target_pos
+  const path = raw.path
+  const startTime = raw.startTime ?? raw.start_time
+  const arrivalTime = raw.arrivalTime ?? raw.arrival_time
+  const speed = raw.speed
+  const progress = raw.progress
+  const collectEndTime = raw.collectEndTime ?? raw.collect_end_time
+
+  if (
+    typeof type !== 'string' ||
+    typeof targetId !== 'number' ||
+    !targetPos ||
+    typeof targetPos.x !== 'number' ||
+    typeof targetPos.y !== 'number' ||
+    !Array.isArray(path) ||
+    typeof startTime !== 'number' ||
+    typeof arrivalTime !== 'number' ||
+    typeof speed !== 'number' ||
+    typeof progress !== 'number'
+  ) {
+    return undefined
+  }
+
+  return {
+    type: type as MarchData['type'],
+    targetId,
+    targetPos: { x: targetPos.x, y: targetPos.y },
+    path: path.map((point) => ({
+      x: typeof point.x === 'number' ? point.x : 0,
+      y: typeof point.y === 'number' ? point.y : 0,
+    })),
+    startTime,
+    arrivalTime,
+    speed,
+    progress,
+    ...(typeof collectEndTime === 'number' ? { collectEndTime } : {}),
+  }
+}
+
+export function normalizeArmyItem(item: unknown): ArmyData | null {
+  if (!item || typeof item !== 'object') {
+    return null
+  }
+
+  const raw = item as RawArmyData
+  const id = raw.id
+  const ownerId = raw.ownerId ?? raw.owner_id
+  const heroId = raw.heroId ?? raw.hero_id ?? 0
+  const soldiers = raw.soldiers
+  const status = raw.status
+  const position = raw.position
+  const sceneId = raw.sceneId ?? raw.scene_id
+  const march = normalizeMarchData(raw.march)
+
+  if (
+    typeof id !== 'number' ||
+    (typeof ownerId !== 'number' && typeof ownerId !== 'string' && typeof ownerId !== 'bigint') ||
+    typeof heroId !== 'number' ||
+    !soldiers ||
+    typeof soldiers !== 'object' ||
+    typeof status !== 'string' ||
+    !position ||
+    typeof position.x !== 'number' ||
+    typeof position.y !== 'number' ||
+    typeof sceneId !== 'number'
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    ownerId: typeof ownerId === 'bigint' ? ownerId : BigInt(ownerId),
+    heroId,
+    soldiers: Object.fromEntries(
+      Object.entries(soldiers).map(([soldierId, count]) => [Number(soldierId), typeof count === 'number' ? count : 0]),
+    ),
+    status: status as ArmyData['status'],
+    position: { x: position.x, y: position.y },
+    sceneId,
+    ...(march ? { march } : {}),
+    ...(raw.load
+      ? {
+          load: {
+            food: typeof raw.load.food === 'number' ? raw.load.food : 0,
+            wood: typeof raw.load.wood === 'number' ? raw.load.wood : 0,
+            stone: typeof raw.load.stone === 'number' ? raw.load.stone : 0,
+            gold: typeof raw.load.gold === 'number' ? raw.load.gold : 0,
+          },
+        }
+      : {}),
+  }
+}
+
+export function normalizeArmies(data: unknown): ArmyData[] {
+  const armies = Array.isArray(data)
+    ? data
+    : data && typeof data === 'object' && Array.isArray((data as { armies?: unknown }).armies)
+      ? (data as { armies: unknown[] }).armies
+      : []
+
+  return armies
+    .map((item) => normalizeArmyItem(item))
+    .filter((item): item is ArmyData => item !== null)
+}
+
+let fetchArmyStatePromise: Promise<{ armies: ArmyData[]; soldiers: SoldierData[] }> | null = null
+
+export async function fetchArmyState() {
+  if (fetchArmyStatePromise) {
+    return fetchArmyStatePromise
+  }
+
+  fetchArmyStatePromise = (async () => {
+    try {
+      const [armiesResponse, soldiersResponse] = await Promise.all([gameClient.api.getArmies(), gameClient.api.getSoldiers()])
+
+      return {
+        armies: normalizeArmies(armiesResponse.data),
+        soldiers: normalizeSoldiers(soldiersResponse.data),
+      }
+    } finally {
+      fetchArmyStatePromise = null
+    }
+  })()
+
+  return fetchArmyStatePromise
+}
+
 export function usePushHandlers() {
   const addSceneObject = useGameStore((state) => state.addSceneObject)
   const removeSceneObject = useGameStore((state) => state.removeSceneObject)
@@ -92,9 +312,7 @@ export function usePushHandlers() {
     ])
 
     if (soldiersResponse.data) {
-      const data = soldiersResponse.data as { soldiers?: unknown[] } | unknown[]
-      const soldiers = Array.isArray(data) ? data : (data.soldiers ?? [])
-      setSoldiers(soldiers as never)
+      setSoldiers(normalizeSoldiers(soldiersResponse.data))
     }
     if (trainQueueResponse.data) {
       setTrainQueue(normalizeTrainQueue(trainQueueResponse.data) as never)
@@ -107,21 +325,17 @@ export function usePushHandlers() {
   }
 
   const refreshBattleState = async () => {
-    const [roleInfoResponse, armiesResponse, soldiersResponse] = await Promise.all([
-      gameClient.api.getRoleInfo(),
-      gameClient.api.getArmies(),
-      gameClient.api.getSoldiers(),
-    ])
+    const [roleInfoResponse, battleState] = await Promise.all([gameClient.api.getRoleInfo(), fetchArmyState()])
 
     if (roleInfoResponse.data) {
-      setRoleInfo(roleInfoResponse.data as never)
+      const roleInfo = normalizeRoleInfo(roleInfoResponse.data)
+      if (roleInfo) {
+        setRoleInfo(roleInfo)
+      }
     }
-    if (armiesResponse.data) {
-      setArmies(armiesResponse.data as never)
-    }
-    if (soldiersResponse.data) {
-      setSoldiers(soldiersResponse.data as never)
-    }
+
+    setArmies(battleState.armies)
+    setSoldiers(battleState.soldiers)
   }
 
   useEffect(() => {
@@ -152,6 +366,7 @@ export function usePushHandlers() {
       if (typeof objectId === 'number' && payload.position) {
         updateSceneObjectPosition(objectId, payload.position)
         addEventLog(`${label}：军队 #${objectId} -> (${payload.position.x}, ${payload.position.y})`)
+        void refreshBattleState()
       }
     }
 
@@ -213,14 +428,11 @@ export function usePushHandlers() {
       })()
     })
 
-    // 资源推送监听：服务端资源更新 push (msgId=1003) 无专用 handler，
-    // 通过 onPush 全局回调接收并更新 resources store
     gameClient.ws.onPush = (raw) => {
       const payload = raw as { code?: number; data?: Record<string, unknown> }
       const data = payload?.data
       if (!data) return
 
-      // 资源推送: { code, data: { rid, food, wood, stone, gold } }
       if (typeof data.food === 'number' || typeof data.gold === 'number') {
         updateResources({
           food: data.food as number,
@@ -257,6 +469,7 @@ export function usePushHandlers() {
     updateResources,
     updateSceneObjectPosition,
     setCityInfo,
+    addEventLog,
   ])
 }
 
@@ -283,65 +496,48 @@ export function useGameApi() {
     }
 
     console.log('[API] login successful');
-    // 暂时不设置 isLoggedIn，等到 loadInitialData 完成后再设置
-    // store.setLoggedIn(true)
     return response
   }, [])
 
   const loadInitialData = useCallback(async () => {
-    // 串行加载数据，避免后端处理过多并行请求
-    const roleInfo = await gameClient.api.getRoleInfo();
-    const armies = await gameClient.api.getArmies();
-    const soldiers = await gameClient.api.getSoldiers();
-    const trainQueue = await gameClient.api.getTrainQueue();
-    const healQueue = await gameClient.api.getHealQueue();
-    const items = await gameClient.api.getItems();
+    const roleInfo = await gameClient.api.getRoleInfo()
+    const armies = await gameClient.api.getArmies()
+    const soldiers = await gameClient.api.getSoldiers()
+    const trainQueue = await gameClient.api.getTrainQueue()
+    const healQueue = await gameClient.api.getHealQueue()
+    const items = await gameClient.api.getItems()
 
-    // 服务端 get_info 返回扁平字段 { rid, name, level, exp, gold, vip, food, wood, stone }
-    // 前端 RoleInfo 期望嵌套 resources: { food, wood, stone, gold }
     if (roleInfo.data) {
-      const d = roleInfo.data as Record<string, unknown>
-      store.setRoleInfo({
-        rid: d.rid as bigint,
-        name: (d.name as string) ?? '',
-        level: (d.level as number) ?? 1,
-        exp: (d.exp as number) ?? 0,
-        vip: (d.vip as number) ?? 0,
-        resources: {
-          food: (d.food as number) ?? 0,
-          wood: (d.wood as number) ?? 0,
-          stone: (d.stone as number) ?? 0,
-          gold: (d.gold as number) ?? 0,
-        },
-        position: { x: 0, y: 0 },
-      })
+      const normalizedRoleInfo = normalizeRoleInfo(roleInfo.data)
+      if (normalizedRoleInfo) {
+        store.setRoleInfo(normalizedRoleInfo)
+      }
     }
     if (armies.data) {
-      const d = armies.data as { armies?: unknown[] }
-      store.setArmies((d.armies ?? []) as never)
+      store.setArmies(normalizeArmies(armies.data))
     }
     if (soldiers.data) {
-      const d = soldiers.data as { soldiers?: unknown[] }
-      store.setSoldiers((d.soldiers ?? []) as never)
+      store.setSoldiers(normalizeSoldiers(soldiers.data))
     }
     if (trainQueue.data) {
       store.setTrainQueue(normalizeTrainQueue(trainQueue.data) as never)
     }
     if (healQueue.data) {
       const d = healQueue.data as { queue?: unknown }
-      store.setHealQueue(Array.isArray(d.queue) ? d.queue as never : d.queue ? [d.queue] as never : [] as never)
+      store.setHealQueue(Array.isArray(d.queue) ? (d.queue as never) : d.queue ? ([d.queue] as never) : ([] as never))
     }
     if (items.data) {
       const d = items.data as { items?: unknown[] }
       store.setItems((d.items ?? []) as never)
     }
 
-    // 获取城池数据
     const cityResult = await gameClient.api.getCityInfo()
+    let cityInfo: CityData | null = null
     if (cityResult.data) {
       const cityData = (cityResult.data as { city?: CityData }).city
       if (cityData) {
         store.setCityInfo(cityData)
+        cityInfo = cityData
       }
     }
 
@@ -349,11 +545,11 @@ export function useGameApi() {
     let sceneInfo = null
     let nearby = null
 
-    const initialSceneId = ((armies.data as ArmyData[] | undefined)?.[0]?.sceneId ?? 1)
+    const normalizedArmies = normalizeArmies(armies.data)
+    const initialSceneId = normalizedArmies[0]?.sceneId ?? 1
     store.setSceneId(initialSceneId)
 
-    // 使用城池坐标进入场景，没有城池则不传坐标
-    const cityPosition = store.cityInfo?.position
+    const cityPosition = cityInfo?.position
     sceneEnter = await gameClient.api.enterScene(initialSceneId, cityPosition?.x, cityPosition?.y)
 
     if (sceneEnter.code === 0) {
@@ -361,9 +557,6 @@ export function useGameApi() {
       nearby = await gameClient.api.getNearby(initialSceneId)
 
       const sceneObjects = new Map<number, SceneObject>()
-
-      // 服务端 get_nearby 返回 { nearby: [...], count: N }
-      // 实体格式为 { id, type, x, y, scene_id, ... } 扁平结构
       const nearbyResult = nearby.data as { nearby?: Record<string, unknown>[] } | undefined
       const nearbyList = nearbyResult?.nearby
 
@@ -373,7 +566,7 @@ export function useGameApi() {
             id: raw.id as number,
             type: raw.type as SceneObject['type'],
             position: { x: (raw.x as number) || 0, y: (raw.y as number) || 0 },
-            ownerId: raw.owner_id as bigint | undefined,
+            ownerId: raw.owner_id != null ? BigInt(raw.owner_id as number | string) : undefined,
             level: raw.level as number | undefined,
             resourceType: raw.resource_type as SceneObject['resourceType'],
             resourceAmount: raw.resource_amount as number | undefined,
@@ -385,7 +578,6 @@ export function useGameApi() {
       store.setSceneObjects(Array.from(sceneObjects.values()) as never)
     }
 
-    // 所有数据加载完成后，设置 isLoggedIn 为 true，触发页面切换
     store.setLoggedIn(true)
 
     return { roleInfo, armies, soldiers, trainQueue, healQueue, items, sceneEnter, sceneInfo, nearby }
